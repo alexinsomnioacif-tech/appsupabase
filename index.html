@@ -589,17 +589,16 @@ function Dashboard({onNav}) {
   const [asesores,setAsesores]=useState([]);
   const [empresas,setEmpresas]=useState([]);
 
-  useEffect(()=>{
-    (async()=>{
-      const [v,p,e,a,et,m]=await Promise.all([db.ventas.count(),db.proyectos.count(),db.empresas.count(),db.asesores.count(),db.etapas.toArray(),db.manzanas.toArray()]);
-      setStats({ventas:v,proyectos:p,empresas:e,asesores:a});
-      setRecent(await db.ventas.orderBy('createdAt').reverse().limit(8).toArray());
-      setProyectos(await db.proyectos.toArray());
-      setEtapas(et); setManzanas(m);
-      setAsesores(await db.asesores.toArray());
-      setEmpresas(await db.empresas.toArray());
-    })();
+  const loadDash = useCallback(async()=>{
+    const [v,p,e,a,et,m]=await Promise.all([db.ventas.count(),db.proyectos.count(),db.empresas.count(),db.asesores.count(),db.etapas.toArray(),db.manzanas.toArray()]);
+    setStats({ventas:v,proyectos:p,empresas:e,asesores:a});
+    setRecent(await db.ventas.orderBy('createdAt').reverse().limit(8).toArray());
+    setProyectos(await db.proyectos.toArray());
+    setEtapas(et); setManzanas(m);
+    setAsesores(await db.asesores.toArray());
+    setEmpresas(await db.empresas.toArray());
   },[]);
+  useEffect(()=>{ loadDash(); const iv=setInterval(loadDash,15000); return ()=>clearInterval(iv); },[loadDash]);
 
   const cards=[
     {label:'Ventas',    val:stats.ventas,    color:'var(--orange)', bg:'var(--orange-lt)'},
@@ -682,16 +681,15 @@ function Registro({onSaved}) {
   const [ok,setOk]=useState(false);
   const [lotErr,setLotErr]=useState('');
 
-  useEffect(()=>{
-    (async()=>{
-      setProyectos(await db.proyectos.toArray());
-      setEtapas(await db.etapas.toArray());
-      setManzanas(await db.manzanas.toArray());
-      setEmpresas(await db.empresas.toArray());
-      setAsesores(await db.asesores.toArray());
-      setVentas(await db.ventas.toArray());
-    })();
+  const loadRegistro = useCallback(async()=>{
+    setProyectos(await db.proyectos.toArray());
+    setEtapas(await db.etapas.toArray());
+    setManzanas(await db.manzanas.toArray());
+    setEmpresas(await db.empresas.toArray());
+    setAsesores(await db.asesores.toArray());
+    setVentas(await db.ventas.toArray());
   },[]);
+  useEffect(()=>{ loadRegistro(); const iv=setInterval(loadRegistro,15000); return ()=>clearInterval(iv); },[loadRegistro]);
 
   // Derived filtered lists
   const etapasFilt = useMemo(()=>f.proyectoId?etapas.filter(e=>e.proyectoId===+f.proyectoId&&e.activa):[],[f.proyectoId,etapas]);
@@ -753,13 +751,16 @@ function Registro({onSaved}) {
 
   const submit = async () => {
     if(!validate()) return;
+    // Validacion en tiempo real contra Supabase — evita lotes duplicados entre dispositivos
+    const {data:ventasLive} = await supa.from('ventas').select('lote,manzana_id').eq('manzana_id', +f.manzanaId);
+    const dupLive = (ventasLive||[]).find(v=>v.lote.trim().toLowerCase()===f.lote.trim().toLowerCase());
+    if(dupLive){ setLotErr('El lote "'+f.lote.trim()+'" ya esta registrado en esta manzana'); return; }
     await db.ventas.add({
       proyectoId:+f.proyectoId, etapaId:+f.etapaId, manzanaId:+f.manzanaId,
       lote:f.lote.trim(), fecha:f.fecha,
       empresaId:+f.empresaId, asesorId:+f.asesorId,
       createdAt:new Date().toISOString()
     });
-    // Refresh ventas
     setVentas(await db.ventas.toArray());
     setF({proyectoId:'',etapaId:'',manzanaId:'',lote:'',fecha:todayStr(),empresaId:'',asesorId:''});
     setLotErr('');
@@ -898,16 +899,15 @@ function Reportes({soloDosMeses, isAdmin}) {
     reloadVentas();
   };
 
-  useEffect(()=>{
-    (async()=>{
-      setVentas(await db.ventas.orderBy('fecha').toArray());
-      setProyectos(await db.proyectos.toArray());
-      setEtapas(await db.etapas.toArray());
-      setManzanas(await db.manzanas.toArray());
-      setEmpresas(await db.empresas.toArray());
-      setAsesores(await db.asesores.toArray());
-    })();
+  const loadReportes = useCallback(async()=>{
+    setVentas(await db.ventas.orderBy('fecha').toArray());
+    setProyectos(await db.proyectos.toArray());
+    setEtapas(await db.etapas.toArray());
+    setManzanas(await db.manzanas.toArray());
+    setEmpresas(await db.empresas.toArray());
+    setAsesores(await db.asesores.toArray());
   },[]);
+  useEffect(()=>{ loadReportes(); const iv=setInterval(loadReportes,15000); return ()=>clearInterval(iv); },[loadReportes]);
 
   const vf = useMemo(()=>ventas.filter(v=>{
     // soloDosMeses ya no restringe — asesor ve todo, solo se quita el panel de filtros avanzados
