@@ -328,7 +328,7 @@ const rows = arr => (arr||[]).map(toCamel);
 const db = {
   config: {
     get: async key => {
-      const {data} = await supa.from('config').select('*').eq('key', key).single();
+      const {data} = await supa.from('config').select('*').eq('key', key).maybeSingle();
       return data;
     },
     put: async obj => { await supa.from('config').upsert(obj, {onConflict:'key'}); },
@@ -403,11 +403,17 @@ const db = {
 };
 
 async function initDB() {
-  const ap = await db.config.get('admin_pin');
-  if (!ap) await db.config.bulkPut([
-    {key:'admin_pin', value:'111111'},
-    {key:'asesor_pin', value:'000000'},
-  ]);
+  // Insertar claves config solo si no existen (no pisar valores ya guardados)
+  const keysNeeded = [
+    {key:'admin_pin',      value:'111111'},
+    {key:'asesor_pin',     value:'000000'},
+    {key:'registro_libre', value:'0'},
+    {key:'wa_url',         value:''},
+  ];
+  for(const k of keysNeeded) {
+    const existing = await db.config.get(k.key);
+    if(!existing) await db.config.put(k);
+  }
   const ec = await db.empresas.count();
   if (ec > 0) return;
   const e1 = await db.empresas.add({nombre:'ACIF'});
@@ -691,6 +697,46 @@ function Registro({onSaved}) {
   },[]);
   useEffect(()=>{ loadRegistro(); const iv=setInterval(loadRegistro,15000); return ()=>clearInterval(iv); },[loadRegistro]);
 
+  const [registroLibre,setRegistroLibre]=useState(false);
+  const [waUrl,setWaUrl]=useState('');
+  const [enviarWa,setEnviarWa]=useState(false);
+  const [lastVenta,setLastVenta]=useState(null);
+  const [nuevoAsesorMode,setNuevoAsesorMode]=useState(false);
+  const [nuevoAsesorNombre,setNuevoAsesorNombre]=useState('');
+  const [nuevoAsesorErr,setNuevoAsesorErr]=useState('');
+  const [nuevoAsesorCodigo,setNuevoAsesorCodigo]=useState('');
+
+  useEffect(()=>{
+    db.config.get('registro_libre').then(r=>setRegistroLibre(r?.value==='1'));
+    db.config.get('wa_url').then(r=>{ if(r?.value) setWaUrl(r.value); });
+  },[]);
+
+  // Genera codigo unico: primeras 3 letras empresa + numero correlativo
+  const generarCodigo = (empNombre, listaAsesores) => {
+    const prefijo = (empNombre||'ASE').replace(/[^A-Za-z]/g,'').substring(0,3).toUpperCase();
+    const nums = listaAsesores
+      .map(a=>a.codigo||'')
+      .filter(c=>c.startsWith(prefijo))
+      .map(c=>parseInt(c.replace(prefijo,''))||0);
+    const next = nums.length>0 ? Math.max(...nums)+1 : 1;
+    return prefijo + String(next).padStart(3,'0');
+  };
+
+  const registrarNuevoAsesor = async () => {
+    if(!nuevoAsesorNombre.trim()){setNuevoAsesorErr('Ingresa tu nombre completo');return;}
+    if(!f.empresaId){setNuevoAsesorErr('Selecciona primero la empresa');return;}
+    const emp = empresas.find(e=>e.id===+f.empresaId);
+    const listaActual = asesores.filter(a=>a.empresaId===+f.empresaId);
+    const codigo = generarCodigo(emp?.nombre||'', listaActual);
+    const nuevoId = await db.asesores.add({nombre:nuevoAsesorNombre.trim(), empresaId:+f.empresaId, codigo});
+    await loadRegistro();
+    set('asesorId', String(nuevoId));
+    setNuevoAsesorCodigo(codigo);
+    setNuevoAsesorMode(false);
+    setNuevoAsesorNombre('');
+    setNuevoAsesorErr('');
+  };
+
   // Derived filtered lists
   const etapasFilt = useMemo(()=>f.proyectoId?etapas.filter(e=>e.proyectoId===+f.proyectoId&&e.activa):[],[f.proyectoId,etapas]);
   const manzanasFilt = useMemo(()=>f.etapaId?manzanas.filter(m=>m.etapaId===+f.etapaId):[],[f.etapaId,manzanas]);
@@ -762,6 +808,16 @@ function Registro({onSaved}) {
       createdAt:new Date().toISOString()
     });
     setVentas(await db.ventas.toArray());
+    // Guardar datos para mensaje WA
+    setLastVenta({
+      proyecto: proyectos.find(p=>p.id===+f.proyectoId)?.nombre||'',
+      etapa:    etapas.find(e=>e.id===+f.etapaId)?.nombre||'',
+      manzana:  manzanas.find(m=>m.id===+f.manzanaId)?.nombre||'',
+      lote:     f.lote.trim(),
+      fecha:    f.fecha,
+      empresa:  empresas.find(e=>e.id===+f.empresaId)?.nombre||'',
+      asesor:   asesores.find(a=>a.id===+f.asesorId)?.nombre||'',
+    });
     setF({proyectoId:'',etapaId:'',manzanaId:'',lote:'',fecha:todayStr(),empresaId:'',asesorId:''});
     setLotErr('');
     setOk(true); setTimeout(()=>setOk(false),3000);
@@ -855,24 +911,70 @@ function Registro({onSaved}) {
             </select>
           </div>
 
-          {/* Asesor — filtrado por empresa */}
+          {/* Asesor — filtrado por empresa + auto-registro */}
           <div className="field">
             <label className={'label'+(errs.asesorId?' err':'')}>Asesor *</label>
-            <select className={sc('asesorId')} value={f.asesorId} onChange={e=>set('asesorId',e.target.value)} disabled={!f.empresaId}>
-              <option value="">{f.empresaId?'Seleccionar asesor':'Primero selecciona empresa'}</option>
-              {asesoresFilt.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}
-            </select>
-            {f.empresaId && asesoresFilt.length===0 &&
-              <span style={{fontSize:11,color:'var(--red)'}}>Esta empresa no tiene asesores registrados</span>
-            }
+            {!nuevoAsesorMode ? (
+              <>
+                <select className={sc('asesorId')} value={f.asesorId} onChange={e=>set('asesorId',e.target.value)} disabled={!f.empresaId}>
+                  <option value="">{f.empresaId?'Seleccionar asesor':'Primero selecciona empresa'}</option>
+                  {asesoresFilt.map(a=><option key={a.id} value={a.id}>{a.codigo?a.nombre+' ('+a.codigo+')':a.nombre}</option>)}
+                </select>
+                {registroLibre && f.empresaId && (
+                  <button type="button" onClick={()=>{setNuevoAsesorMode(true);setNuevoAsesorErr('');setNuevoAsesorCodigo('');}}
+                    style={{marginTop:6,background:'none',border:'1.5px dashed var(--orange-md)',borderRadius:8,padding:'7px 12px',fontSize:13,color:'var(--orange)',fontFamily:'Plus Jakarta Sans',fontWeight:600,cursor:'pointer',width:'100%',textAlign:'left'}}>
+                    + No estoy en la lista — Registrarme como nuevo asesor
+                  </button>
+                )}
+                {nuevoAsesorCodigo && (
+                  <div className="success-box" style={{marginTop:6,fontSize:12}}>
+                    ✅ Registrado. Tu código único: <strong style={{fontFamily:'JetBrains Mono',letterSpacing:2}}>{nuevoAsesorCodigo}</strong> — guárdalo para futuras sesiones.
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{border:'1.5px solid var(--orange)',borderRadius:10,padding:'12px 14px',background:'var(--orange-lt)'}}>
+                <p style={{fontSize:13,fontWeight:700,marginBottom:10,color:'var(--orange)'}}>Nuevo asesor — {empresas.find(e=>e.id===+f.empresaId)?.nombre}</p>
+                <input className="input" placeholder="Tu nombre completo *" value={nuevoAsesorNombre}
+                  onChange={e=>{setNuevoAsesorNombre(e.target.value);setNuevoAsesorErr('');}}
+                  style={{marginBottom:8}} autoFocus/>
+                {nuevoAsesorErr && <div className="error-box" style={{marginBottom:8,fontSize:12}}>{nuevoAsesorErr}</div>}
+                <div style={{display:'flex',gap:8}}>
+                  <button type="button" className="btn btn-ghost" style={{flex:1,fontSize:13}} onClick={()=>{setNuevoAsesorMode(false);setNuevoAsesorNombre('');}}>Cancelar</button>
+                  <button type="button" className="btn btn-primary" style={{flex:2,fontSize:13}} onClick={registrarNuevoAsesor}>{I.check} Registrarme</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        <div style={{marginTop:24}}>
+        {/* WhatsApp checkbox — solo si admin configuró una URL */}
+        {waUrl && (
+          <div style={{marginTop:16,display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#F0FDF4',border:'1px solid #BBF7D0',cursor:'pointer'}} onClick={()=>setEnviarWa(v=>!v)}>
+            <div style={{width:20,height:20,borderRadius:5,border:'2px solid '+(enviarWa?'#16A34A':'#D4D3CC'),background:enviarWa?'#16A34A':'transparent',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,transition:'all .15s'}}>
+              {enviarWa&&<svg width="12" height="12" fill="none" stroke="white" strokeWidth="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>}
+            </div>
+            <span style={{fontSize:13,fontWeight:600,color:'#16A34A'}}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#16A34A" style={{marginRight:5,verticalAlign:'middle'}}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.556 4.112 1.528 5.837L0 24l6.337-1.508A11.953 11.953 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.366l-.36-.214-3.76.895.955-3.668-.234-.376A9.818 9.818 0 1112 21.818z"/></svg>
+              Enviar al grupo de WhatsApp después de registrar
+            </span>
+          </div>
+        )}
+
+        <div style={{marginTop:16,display:'flex',flexDirection:'column',gap:10}}>
           <button className="btn btn-primary" onClick={submit} style={{width:'100%',fontSize:15,padding:'12px'}}>
             {I.check} Registrar Venta
           </button>
         </div>
+
+        {/* Botón WA — aparece tras registrar exitosamente */}
+        {ok && enviarWa && waUrl && lastVenta && (() => {
+          const lines = ['\u2705 *NUEVA VENTA REGISTRADA*','','\uD83C\uDFD7\uFE0F Proyecto: '+lastVenta.proyecto,'\uD83D\uDCCD Etapa: '+lastVenta.etapa,'\uD83C\uDFE0 Manzana: '+lastVenta.manzana,'\uD83D\uDD22 Lote: '+lastVenta.lote,'\uD83D\uDCC5 Fecha: '+fmtDate(lastVenta.fecha),'\uD83C\uDFE2 Empresa: '+lastVenta.empresa,'\uD83D\uDC64 Asesor: '+lastVenta.asesor];
+          const msg = encodeURIComponent(lines.join('\n'));
+          const href = waUrl.includes('chat.whatsapp.com') ? waUrl : ('https://wa.me/'+waUrl.replace(/[^0-9]/g,'')+'?text='+msg);
+          const waIcon = <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.556 4.112 1.528 5.837L0 24l6.337-1.508A11.953 11.953 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.366l-.36-.214-3.76.895.955-3.668-.234-.376A9.818 9.818 0 1112 21.818z"/></svg>;
+          return <a href={href} target="_blank" rel="noopener noreferrer" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,padding:'12px',borderRadius:10,background:'#16A34A',color:'#fff',fontFamily:'Plus Jakarta Sans',fontWeight:700,fontSize:15,textDecoration:'none',marginTop:4}}>{waIcon} Enviar mensaje al grupo</a>;
+        })()}
       </div>
     </div>
   );
@@ -1566,14 +1668,86 @@ function ConfigPins({currentRol}) {
 }
 
 /* ══════════════════════════════════════════
+   CONFIG — AJUSTES GENERALES
+══════════════════════════════════════════ */
+function ConfigAjustes() {
+  const [registroLibre,setRegistroLibre]=useState(false);
+  const [waUrl,setWaUrl]=useState('');
+  const [saved,setSaved]=useState(false);
+
+  useEffect(()=>{
+    db.config.get('registro_libre').then(r=>setRegistroLibre(r?.value==='1'));
+    db.config.get('wa_url').then(r=>setWaUrl(r?.value||''));
+  },[]);
+
+  const guardar = async () => {
+    await db.config.put({key:'registro_libre', value:registroLibre?'1':'0'});
+    await db.config.put({key:'wa_url',         value:waUrl.trim()});
+    setSaved(true); setTimeout(()=>setSaved(false),2500);
+  };
+
+  return (
+    <div className="fade-up" style={{maxWidth:520}}>
+      <h3 style={{marginBottom:4}}>Ajustes generales</h3>
+      <p style={{fontSize:13,color:'var(--ink3)',marginBottom:20}}>Controla funciones avanzadas de la aplicación</p>
+
+      {/* Registro libre de asesores */}
+      <div className="card" style={{marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'flex-start',gap:14}}>
+          <label className="toggle" style={{marginTop:2,cursor:'pointer'}}>
+            <input type="checkbox" checked={registroLibre} onChange={e=>setRegistroLibre(e.target.checked)}/>
+            <div className="toggle-track"><div className="toggle-thumb"/></div>
+          </label>
+          <div>
+            <div style={{fontWeight:700,fontSize:15,marginBottom:3}}>Permitir auto-registro de asesores</div>
+            <p style={{fontSize:13,color:'var(--ink3)'}}>
+              Cuando está activo, los asesores pueden registrar su nombre en la app si no están en la lista de su empresa. Se les asigna un código único automáticamente.
+            </p>
+            <span className={`badge ${registroLibre?'badge-green':'badge-gray'}`} style={{marginTop:8,display:'inline-flex'}}>
+              {registroLibre?'Activo — los asesores pueden auto-registrarse':'Inactivo — solo asesores pre-cargados'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* URL WhatsApp grupo */}
+      <div className="card" style={{marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#16A34A"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.556 4.112 1.528 5.837L0 24l6.337-1.508A11.953 11.953 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.006-1.366l-.36-.214-3.76.895.955-3.668-.234-.376A9.818 9.818 0 1112 21.818z"/></svg>
+          <span style={{fontWeight:700,fontSize:15}}>URL del grupo de WhatsApp</span>
+        </div>
+        <p style={{fontSize:13,color:'var(--ink3)',marginBottom:12}}>
+          Pega aquí el enlace de invitación del grupo (empieza con <strong>https://chat.whatsapp.com/...</strong>) o un número de WhatsApp (ej: <strong>51999999999</strong>). Los asesores verán una opción para enviar el resumen de su venta ahí.
+        </p>
+        <div className="field">
+          <input className="input" value={waUrl} onChange={e=>setWaUrl(e.target.value)}
+            placeholder="https://chat.whatsapp.com/XXXXXX  ó  51999999999"/>
+        </div>
+        {waUrl && (
+          <div className="info-box" style={{marginTop:10,fontSize:12}}>
+            ✅ URL configurada — los asesores verán el botón de WhatsApp al registrar una venta
+          </div>
+        )}
+      </div>
+
+      {saved && <div className="success-box" style={{marginBottom:14}}>{I.check} Ajustes guardados correctamente</div>}
+      <button className="btn btn-primary" style={{width:'100%',padding:'12px',fontSize:15}} onClick={guardar}>
+        {I.check} Guardar ajustes
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
    CONFIGURACIÓN (tabs)
 ══════════════════════════════════════════ */
 function Config({currentRol}) {
   const [tab,setTab]=useState('socios');
   const tabs=[
-    {id:'socios',  label:'Socios',    icon:I.building},
-    {id:'proyectos',label:'Proyectos',icon:I.layers},
-    {id:'pines',   label:'Accesos PIN',icon:I.key},
+    {id:'socios',   label:'Socios',     icon:I.building},
+    {id:'proyectos',label:'Proyectos',  icon:I.layers},
+    {id:'pines',    label:'Accesos PIN',icon:I.key},
+    {id:'ajustes',  label:'Ajustes',    icon:I.gear},
   ];
   return (
     <div className="fade-up">
@@ -1587,6 +1761,7 @@ function Config({currentRol}) {
       {tab==='socios'    && <ConfigSocios/>}
       {tab==='proyectos' && <ConfigProyectos/>}
       {tab==='pines'     && <ConfigPins currentRol={currentRol}/>}
+      {tab==='ajustes'   && <ConfigAjustes/>}
     </div>
   );
 }
