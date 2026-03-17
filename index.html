@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>Appari Leads</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── Reset & Base ── */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{height:100%;font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#FAFAF8;color:#1A1A1A;overscroll-behavior:none}
+:root{
+  --orange:#FF5C00;--orange-lt:#FFF3EC;--orange-md:#FFCBA4;
+  --ink:#1A1A1A;--ink2:#555;--ink3:#999;--ink4:#C8C8C8;
+  --bg:#FAFAF8;--surface:#FFFFFF;--surface2:#F7F6F3;--surface3:#F0EFE9;
+  --border:#E8E7E2;--border2:#D4D3CC;
+  --green:#16A34A;--green-lt:#DCFCE7;
+  --blue:#2563EB;--blue-lt:#EFF6FF;
+  --red:#DC2626;--red-lt:#FEF2F2;
+  --sidebar:220px;--topbar:52px;--bottomnav:60px;
+  --radius:10px;--radius-lg:14px;--radius-xl:20px;
+}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#D4D3CC;border-radius:4px}
+
+/* ── Typography ── */
+h1{font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1.2}
+h2{font-size:18px;font-weight:700;letter-spacing:-.02em}
+h3{font-size:15px;font-weight:700}
+
+/* ── Animations ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-7px)}30%{transform:translateX(7px)}45%{transform:translateX(-5px)}60%{transform:translateX(5px)}75%{transform:translateX(-3px)}90%{transform:translateX(3px)}}
+@keyframes pop{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.fade-up{animation:fadeUp .22s ease forwards}
+.shake{animation:shake .4s ease}
+
+/* ── Layout ── */
+.layout{display:flex;min-height:100vh}
+.sidebar{
+  width:var(--sidebar);background:var(--surface2);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  position:fixed;top:0;bottom:0;left:0;z-index:100;
+  transition:transform .25s cubic-bezier(.4,0,.2,1);
+}
+.main{margin-left:var(--sidebar);padding:28px 32px;min-height:100vh;background:var(--bg);width:calc(100% - var(--sidebar))}
+.topbar{
+  display:none;position:fixed;top:0;left:0;right:0;
+  height:var(--topbar);background:var(--surface);border-bottom:1px solid var(--border);
+  align-items:center;justify-content:space-between;padding:0 16px;z-index:90;
+}
+.bottomnav{
+  display:none;position:fixed;bottom:0;left:0;right:0;
+  height:var(--bottomnav);background:var(--surface);border-top:1px solid var(--border);
+  align-items:stretch;z-index:90;padding-bottom:env(safe-area-inset-bottom);
+}
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:99;display:none}
+
+/* Tablet & Mobile (≤ 900px) */
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%);box-shadow:4px 0 20px rgba(0,0,0,.1)}
+  .sidebar.open{transform:translateX(0)}
+  .backdrop.open{display:block}
+  .main{margin-left:0;padding:calc(var(--topbar) + 16px) 16px calc(var(--bottomnav) + 16px);width:100%}
+  .topbar{display:flex}
+  .bottomnav{display:flex}
+  .desktop-header{display:none!important}
+  .mobile-title{display:block!important}
+}
+.mobile-title{display:none;font-size:20px;font-weight:800;margin-bottom:16px;letter-spacing:-.02em}
+
+/* ── Nav items ── */
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 12px;border-radius:var(--radius);
+  font-size:14px;font-weight:500;color:var(--ink2);
+  border:none;background:none;cursor:pointer;width:100%;text-align:left;
+  transition:background .12s,color .12s;min-height:40px;
+  -webkit-user-select:none;user-select:none;
+}
+.nav-item:hover{background:var(--surface3);color:var(--ink)}
+.nav-item.active{background:var(--orange-lt);color:var(--orange);font-weight:600}
+.bnav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  background:none;border:none;outline:none;cursor:pointer;color:var(--ink4);
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:9px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;padding:5px 2px;transition:color .12s;
+  -webkit-user-select:none;user-select:none;
+}
+.bnav-btn.active{color:var(--orange)}
+
+/* ── Buttons ── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:8px 16px;border-radius:var(--radius);
+  font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:14px;
+  cursor:pointer;transition:all .12s;border:none;
+  -webkit-user-select:none;user-select:none;min-height:38px;white-space:nowrap;
+}
+.btn-primary{background:var(--orange);color:#fff}
+.btn-primary:hover{background:#E05200}
+.btn-primary:active{transform:scale(.97)}
+.btn-ghost{background:transparent;color:var(--ink2);border:1px solid var(--border2)}
+.btn-ghost:hover{background:var(--surface3);color:var(--ink)}
+.btn-ghost:active{transform:scale(.97)}
+.btn-danger{background:transparent;color:var(--red);border:1px solid #FECACA}
+.btn-danger:hover{background:var(--red-lt)}
+.btn-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:32px;height:32px;border-radius:8px;border:none;
+  background:transparent;cursor:pointer;color:var(--ink3);transition:all .12s;
+}
+.btn-icon:hover{background:var(--surface3);color:var(--ink)}
+.btn-icon.danger:hover{background:var(--red-lt);color:var(--red)}
+
+/* ── Form fields ── */
+.field{display:flex;flex-direction:column;gap:6px}
+.label{font-size:13px;font-weight:600;color:var(--ink2)}
+.label.err{color:var(--red)}
+.input,.select{
+  width:100%;border:1.5px solid var(--border);border-radius:var(--radius);
+  padding:9px 12px;font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;
+  color:var(--ink);background:var(--surface);outline:none;
+  transition:border-color .12s,box-shadow .12s;min-height:42px;
+  -webkit-appearance:none;appearance:none;
+}
+.input:focus,.select:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,92,0,.1)}
+.input.err,.select.err{border-color:var(--red);box-shadow:0 0 0 3px rgba(220,38,38,.1)}
+.input:disabled,.select:disabled{background:var(--surface3);color:var(--ink3);cursor:not-allowed}
+.select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:34px;
+}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.card-sm{padding:14px 16px}
+
+/* ── Badges ── */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.02em;white-space:nowrap;
+}
+.badge-orange{background:var(--orange-lt);color:var(--orange)}
+.badge-green{background:var(--green-lt);color:var(--green)}
+.badge-gray{background:var(--surface3);color:var(--ink3)}
+.badge-blue{background:var(--blue-lt);color:var(--blue)}
+.badge-red{background:var(--red-lt);color:var(--red)}
+
+/* ── Toggle ── */
+.toggle{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.toggle input{display:none}
+.toggle-track{width:38px;height:22px;background:#D1D5DB;border-radius:11px;transition:background .15s;position:relative}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle input:checked+.toggle-track{background:var(--orange)}
+.toggle input:checked+.toggle-track .toggle-thumb{transform:translateX(16px)}
+
+/* ── Modal (bottom-sheet on mobile) ── */
+.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;z-index:200;animation:fadeUp .15s ease}
+.modal-box{background:var(--surface);border-radius:var(--radius-xl) var(--radius-xl) 0 0;padding:24px;width:100%;max-width:520px;max-height:92vh;overflow-y:auto;animation:slideUp .25s ease}
+.modal-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:0 auto 20px}
+@media(min-width:640px){
+  .modal-wrap{align-items:center}
+  .modal-box{border-radius:var(--radius-xl);animation:fadeUp .2s ease;max-height:88vh}
+  .modal-handle{display:none}
+}
+
+/* ── PIN Screen ── */
+.pin-screen{min-height:100vh;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px 20px}
+.pin-wrap{width:100%;max-width:320px;display:flex;flex-direction:column;align-items:center}
+.pin-dots{display:flex;gap:12px;margin:20px 0 24px}
+.pin-dot{width:14px;height:14px;border-radius:50%;background:var(--surface3);border:1.5px solid var(--border2);transition:all .15s}
+.pin-dot.on{background:var(--orange);border-color:var(--orange);transform:scale(1.15)}
+.pin-dot.err{background:var(--red);border-color:var(--red)}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}
+.nkey{
+  aspect-ratio:1;border-radius:50%;border:1.5px solid var(--border);
+  background:var(--surface);color:var(--ink);
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:500;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .1s;-webkit-user-select:none;user-select:none;min-height:64px;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.nkey:active{background:var(--orange-lt);border-color:var(--orange-md);transform:scale(.93)}
+.nkey.empty{background:transparent;border-color:transparent;box-shadow:none;pointer-events:none}
+.nkey.del-key{background:var(--surface3);color:var(--ink2)}
+.role-chips{display:flex;gap:8px;margin-bottom:20px}
+.role-chip{
+  flex:1;padding:9px 16px;border-radius:20px;font-size:14px;font-weight:600;
+  cursor:pointer;border:1.5px solid var(--border2);
+  color:var(--ink3);background:var(--surface);
+  transition:all .15s;-webkit-user-select:none;user-select:none;text-align:center;
+}
+.role-chip.on{color:var(--orange);border-color:var(--orange);background:var(--orange-lt)}
+
+/* ── Lotes progress bar ── */
+.lot-bar{height:5px;border-radius:3px;background:var(--surface3);overflow:hidden;margin-top:5px}
+.lot-fill{height:100%;border-radius:3px;background:var(--orange);transition:width .4s ease}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:580px}
+.tbl th{padding:9px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap}
+.tbl td{padding:10px 14px;border-bottom:1px solid #F5F5F0;vertical-align:middle}
+.tbl tr:hover td{background:#FAFAF8}
+.tbl tr:last-child td{border-bottom:none}
+.tbl-sum td{background:var(--orange-lt)!important;font-weight:700;border-top:2px solid var(--orange-md)!important}
+
+/* ── Section header ── */
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+
+/* ── Divider ── */
+.divider{height:1px;background:var(--border);margin:16px 0}
+
+/* ── Info box ── */
+.info-box{background:var(--blue-lt);border:1px solid #BFDBFE;border-radius:var(--radius);padding:10px 14px;font-size:13px;color:#1D4ED8}
+.warn-box{background:var(--orange-lt);border:1px solid var(--orange-md);border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--orange)}
+.success-box{background:var(--green-lt);border:1px solid #BBF7D0;border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--green)}
+.error-box{background:var(--red-lt);border:1px solid #FECACA;border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--red)}
+
+/* ── Inactivity bar ── */
+.inact-bar{position:fixed;bottom:var(--bottomnav);left:0;right:0;background:var(--orange);color:#fff;padding:10px 16px;font-size:13px;font-weight:500;display:flex;align-items:center;justify-content:space-between;z-index:150}
+@media(min-width:901px){.inact-bar{bottom:0}}
+
+/* ── Responsive grid helpers ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+@media(max-width:1100px){.grid-4{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;gap:12px}}
+
+/* ── Mobile card list for table rows ── */
+.mob-list{display:none}
+.desk-table{display:block}
+@media(max-width:900px){.mob-list{display:block}.desk-table{display:none}}
+
+/* ── Print ── */
+@media print{
+  .no-print{display:none!important}
+  body{background:#fff}
+  .print-hdr th{background:var(--orange)!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+
+/* ── Logo ── */
+.logo-mark{display:flex;align-items:center;gap:9px}
+.logo-text{font-weight:800;letter-spacing:-.03em;color:var(--ink)}
+.logo-accent{color:var(--orange)}
+
+/* ── Config drill (mobile) ── */
+.drill-head{display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--surface2);border-bottom:1px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.drill-body{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+
+/* ── Proyectos: 3-col on wide screens, drill-down on narrow ── */
+.proy-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+@media(max-width:1100px){.proy-grid{grid-template-columns:1fr 1fr}}
+.proy-desktop{display:block}
+.proy-mobile{display:none}
+@media(max-width:900px){
+  .proy-desktop{display:none}
+  .proy-mobile{display:block}
+}
+
+/* ── FAB (Floating Action Button) ── */
+.fab{
+  display:none;
+  position:fixed;bottom:calc(var(--bottomnav) + 14px);right:18px;
+  width:52px;height:52px;border-radius:50%;
+  background:var(--orange);color:#fff;border:none;
+  box-shadow:0 4px 16px rgba(255,92,0,.4);
+  cursor:pointer;align-items:center;justify-content:center;
+  z-index:89;transition:transform .15s,box-shadow .15s;
+  -webkit-user-select:none;user-select:none;
+}
+.fab:active{transform:scale(.92);box-shadow:0 2px 8px rgba(255,92,0,.3)}
+@media(max-width:900px){.fab{display:flex}}
+.fab-hide{display:none!important}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useMemo,useCallback} = React;
+
+/* ══════════════════════════════════════════
+   SUPABASE CLIENT
+══════════════════════════════════════════ */
+const SUPA_URL  = 'https://vdtrtyrtccizitmfhzrc.supabase.co';
+const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkdHJ0eXJ0Y2Npeml0bWZoenJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MDc4MjEsImV4cCI6MjA4OTI4MzgyMX0.xFO5QpFAVp5a0b0TEls6OPHa3J9ERYkUwatFapc8gN0';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+/* ── Conversores snake_case ↔ camelCase ── */
+const toSnake = obj => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const map = {
+    empresaId:'empresa_id', asesorId:'asesor_id',
+    proyectoId:'proyecto_id', etapaId:'etapa_id',
+    manzanaId:'manzana_id', totalLotes:'total_lotes',
+    createdAt:'created_at'
+  };
+  const r = {};
+  for (const [k,v] of Object.entries(obj)) r[map[k]||k] = v;
+  return r;
+};
+const toCamel = obj => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const map = {
+    empresa_id:'empresaId', asesor_id:'asesorId',
+    proyecto_id:'proyectoId', etapa_id:'etapaId',
+    manzana_id:'manzanaId', total_lotes:'totalLotes',
+    created_at:'createdAt'
+  };
+  const r = {};
+  for (const [k,v] of Object.entries(obj)) r[map[k]||k] = v;
+  return r;
+};
+const rows = arr => (arr||[]).map(toCamel);
+
+/* ── Thin DB wrapper que imita la API de Dexie ── */
+const db = {
+  config: {
+    get: async key => {
+      const {data} = await supa.from('config').select('*').eq('key', key).single();
+      return data;
+    },
+    put: async obj => { await supa.from('config').upsert(obj, {onConflict:'key'}); },
+    bulkPut: async arr => { await supa.from('config').upsert(arr, {onConflict:'key'}); },
+  },
+  empresas: {
+    toArray: async () => rows((await supa.from('empresas').select('*').order('id')).data),
+    add: async obj => { const {data} = await supa.from('empresas').insert(toSnake(obj)).select().single(); return data.id; },
+    update: async (id, obj) => { await supa.from('empresas').update(toSnake(obj)).eq('id', id); },
+    delete: async id => { await supa.from('empresas').delete().eq('id', id); },
+    count: async () => { const {count} = await supa.from('empresas').select('*',{count:'exact',head:true}); return count||0; },
+  },
+  asesores: {
+    toArray: async () => rows((await supa.from('asesores').select('*').order('id')).data),
+    add: async obj => { const {data} = await supa.from('asesores').insert(toSnake(obj)).select().single(); return data.id; },
+    update: async (id, obj) => { await supa.from('asesores').update(toSnake(obj)).eq('id', id); },
+    delete: async id => { await supa.from('asesores').delete().eq('id', id); },
+    where: col => ({
+      equals: val => ({
+        delete: async () => {
+          const colSnake = {empresaId:'empresa_id',asesorId:'asesor_id'}[col]||col;
+          await supa.from('asesores').delete().eq(colSnake, val);
+        }
+      })
+    }),
+    bulkAdd: async arr => { await supa.from('asesores').insert(arr.map(toSnake)); },
+  },
+  proyectos: {
+    toArray: async () => rows((await supa.from('proyectos').select('*').order('id')).data),
+    add: async obj => { const {data} = await supa.from('proyectos').insert(toSnake(obj)).select().single(); return data.id; },
+    update: async (id, obj) => { await supa.from('proyectos').update(toSnake(obj)).eq('id', id); },
+    delete: async id => { await supa.from('proyectos').delete().eq('id', id); },
+  },
+  etapas: {
+    toArray: async () => rows((await supa.from('etapas').select('*').order('id')).data),
+    add: async obj => { const {data} = await supa.from('etapas').insert(toSnake(obj)).select().single(); return data.id; },
+    update: async (id, obj) => { await supa.from('etapas').update(toSnake(obj)).eq('id', id); },
+    delete: async id => { await supa.from('etapas').delete().eq('id', id); },
+  },
+  manzanas: {
+    toArray: async () => rows((await supa.from('manzanas').select('*').order('id')).data),
+    add: async obj => { const {data} = await supa.from('manzanas').insert(toSnake(obj)).select().single(); return data.id; },
+    update: async (id, obj) => { await supa.from('manzanas').update(toSnake(obj)).eq('id', id); },
+    delete: async id => { await supa.from('manzanas').delete().eq('id', id); },
+    bulkAdd: async arr => { await supa.from('manzanas').insert(arr.map(toSnake)); },
+  },
+  ventas: {
+    toArray: async () => rows((await supa.from('ventas').select('*').order('fecha')).data),
+    add: async obj => { const {data} = await supa.from('ventas').insert(toSnake(obj)).select().single(); return data.id; },
+    delete: async id => { await supa.from('ventas').delete().eq('id', id); },
+    orderBy: col => ({
+      reverse: () => ({
+        limit: n => ({
+          toArray: async () => rows((await supa.from('ventas').select('*').order(col==='createdAt'?'created_at':col, {ascending:false}).limit(n)).data)
+        })
+      })
+    }),
+  },
+};
+
+async function initDB() {
+  const ap = await db.config.get('admin_pin');
+  if (!ap) await db.config.bulkPut([
+    {key:'admin_pin', value:'111111'},
+    {key:'asesor_pin', value:'000000'},
+  ]);
+  const ec = await db.empresas.count();
+  if (ec > 0) return;
+  const e1 = await db.empresas.add({nombre:'ACIF'});
+  const e2 = await db.empresas.add({nombre:'BIACOM'});
+  await db.asesores.bulkAdd([
+    {empresaId:e1, nombre:'Carlos Ramirez'},
+    {empresaId:e1, nombre:'Ana Torres'},
+    {empresaId:e2, nombre:'Luis Paredes'},
+    {empresaId:e2, nombre:'Maria Quispe'},
+  ]);
+  const p1 = await db.proyectos.add({nombre:'Altamira'});
+  const et1 = await db.etapas.add({proyectoId:p1, nombre:'Etapa 1', activa:true});
+  const et2 = await db.etapas.add({proyectoId:p1, nombre:'Etapa 2', activa:false});
+  await db.manzanas.bulkAdd([
+    {etapaId:et1, nombre:'Manzana A', totalLotes:50},
+    {etapaId:et1, nombre:'Manzana B', totalLotes:58},
+    {etapaId:et2, nombre:'Manzana C', totalLotes:35},
+  ]);
+}
+
+/* ══════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════ */
+const todayStr = () => new Date().toISOString().split('T')[0];
+const twoMonthsAgo = () => { const d=new Date(); d.setMonth(d.getMonth()-2); d.setDate(1); return d.toISOString().split('T')[0]; };
+const fmtDate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'}) : '-';
+const fmtShort = d => d ? new Date(d+'T00:00:00').toLocaleDateString('es-PE',{day:'2-digit',month:'short'}) : '-';
+const byId = (arr,id) => arr.find(x=>x.id===id);
+const nameById = (arr,id) => arr.find(x=>x.id===id)?.nombre || '-';
+
+/* ══════════════════════════════════════════
+   ICONS (SVG inline)
+══════════════════════════════════════════ */
+const I = {
+  home:    <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  plus:    <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  table:   <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="12" y1="3" x2="12" y2="21"/></svg>,
+  gear:    <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  user:    <svg width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  users:   <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  building:<svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="22" x2="9" y2="2"/><line x1="4" y1="12" x2="9" y2="12"/><line x1="14" y1="7" x2="19" y2="7"/><line x1="14" y1="12" x2="19" y2="12"/><line x1="14" y1="17" x2="19" y2="17"/></svg>,
+  layers:  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+  key:     <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6"/><path d="M15.5 7.5l3 3L22 7l-3-3"/></svg>,
+  edit:    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  trash:   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m2 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
+  check:   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>,
+  x:       <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  logout:  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  menu:    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+  back:    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>,
+  chevR:   <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>,
+  filter:  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+  dl:      <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  del:     <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/><line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/></svg>,
+};
+
+/* ══════════════════════════════════════════
+   LOGO
+══════════════════════════════════════════ */
+function Logo({size='md'}) {
+  const w = size==='lg'?32:22, f = size==='lg'?20:14;
+  return (
+    <div className="logo-mark">
+      <svg width={w} height={w} viewBox="0 0 32 32">
+        <circle cx="16" cy="16" r="16" fill="#FF5C00"/>
+        <path d="M10 22 L16 10 L22 22 M12.5 18 H19.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      </svg>
+      <span className="logo-text" style={{fontSize:f}}>Appari <span className="logo-accent">Leads</span></span>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   MODAL
+══════════════════════════════════════════ */
+function Modal({title,onClose,children,wide}) {
+  return (
+    <div className="modal-wrap" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box" style={wide?{maxWidth:620}:{}}>
+        <div className="modal-handle"/>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+          <h2 style={{fontSize:17}}>{title}</h2>
+          <button className="btn-icon" onClick={onClose}>{I.x}</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   PIN LOGIN
+══════════════════════════════════════════ */
+function PinLogin({onLogin}) {
+  const [rol,setRol]       = useState('admin');
+  const [pin,setPin]       = useState('');
+  const [err,setErr]       = useState('');
+  const [shake,setShake]   = useState(false);
+  const [tries,setTries]   = useState(0);
+  const [locked,setLocked] = useState(false);
+  const [secs,setSecs]     = useState(0);
+
+  useEffect(()=>{
+    if(!locked) return;
+    let t=30; setSecs(t);
+    const iv=setInterval(()=>{ t--; setSecs(t); if(t<=0){clearInterval(iv);setLocked(false);setTries(0);} },1000);
+    return ()=>clearInterval(iv);
+  },[locked]);
+
+  const push = d => {
+    if(locked||pin.length>=6) return;
+    const next=pin+d; setPin(next); setErr('');
+    if(next.length===6) verify(next);
+  };
+  const pop = () => { setPin(p=>p.slice(0,-1)); setErr(''); };
+
+  const verify = async code => {
+    const cfg = await db.config.get(rol==='admin'?'admin_pin':'asesor_pin');
+    if(cfg?.value===code) { onLogin({rol, nombre: rol==='admin'?'Administrador':'Asesor'}); return; }
+    const n=tries+1; setTries(n); setPin('');
+    setShake(true); setTimeout(()=>setShake(false),450);
+    if(n>=5){ setLocked(true); setErr('Demasiados intentos. Espera 30s.'); }
+    else setErr('PIN incorrecto — '+(5-n)+' intento'+(5-n===1?'':'s')+' restante'+(5-n===1?'':'s'));
+  };
+
+  const pad=[['1','2','3'],['4','5','6'],['7','8','9'],[null,'0','del']];
+
+  return (
+    <div className="pin-screen">
+      <div className="pin-wrap fade-up">
+        <Logo size="lg"/>
+        <p style={{color:'var(--ink3)',fontSize:13,marginTop:8,marginBottom:24,textAlign:'center'}}>Selecciona tu rol e ingresa tu PIN</p>
+
+        <div className="role-chips">
+          {['admin','asesor'].map(r=>(
+            <button key={r} className={'role-chip'+(rol===r?' on':'')} onClick={()=>{setRol(r);setPin('');setErr('');}}>
+              {r==='admin'?'Administrador':'Asesor'}
+            </button>
+          ))}
+        </div>
+
+        <div className={shake?'shake':''}>
+          <div className="pin-dots">
+            {[0,1,2,3,4,5].map(i=>(
+              <div key={i} className={'pin-dot'+(i<pin.length?' on':'')+(err&&pin.length===0?' err':'')}/>
+            ))}
+          </div>
+        </div>
+
+        <div style={{minHeight:32,textAlign:'center',marginBottom:8}}>
+          {locked ? <span style={{color:'var(--red)',fontSize:13,fontWeight:600}}>Bloqueado — espera {secs}s</span>
+                  : err ? <span style={{color:'var(--red)',fontSize:13}}>{err}</span> : null}
+        </div>
+
+        <div className="numpad" style={{opacity:locked?.4:1,pointerEvents:locked?'none':'auto'}}>
+          {pad.flat().map((k,i)=>{
+            if(!k) return <div key={i} className="nkey empty"/>;
+            if(k==='del') return <button key={i} className="nkey del-key" onClick={pop}>{I.del}</button>;
+            return <button key={i} className="nkey" onClick={()=>push(k)}>{k}</button>;
+          })}
+        </div>
+
+        <p style={{color:'var(--ink4)',fontSize:11,marginTop:24}}>Appari Leads © {new Date().getFullYear()}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════════ */
+function Dashboard({onNav}) {
+  const [stats,setStats]=useState({ventas:0,proyectos:0,empresas:0,asesores:0});
+  const [recent,setRecent]=useState([]);
+  const [proyectos,setProyectos]=useState([]);
+  const [etapas,setEtapas]=useState([]);
+  const [manzanas,setManzanas]=useState([]);
+  const [asesores,setAsesores]=useState([]);
+  const [empresas,setEmpresas]=useState([]);
+
+  useEffect(()=>{
+    (async()=>{
+      const [v,p,e,a,et,m]=await Promise.all([db.ventas.count(),db.proyectos.count(),db.empresas.count(),db.asesores.count(),db.etapas.toArray(),db.manzanas.toArray()]);
+      setStats({ventas:v,proyectos:p,empresas:e,asesores:a});
+      setRecent(await db.ventas.orderBy('createdAt').reverse().limit(8).toArray());
+      setProyectos(await db.proyectos.toArray());
+      setEtapas(et); setManzanas(m);
+      setAsesores(await db.asesores.toArray());
+      setEmpresas(await db.empresas.toArray());
+    })();
+  },[]);
+
+  const cards=[
+    {label:'Ventas',    val:stats.ventas,    color:'var(--orange)', bg:'var(--orange-lt)'},
+    {label:'Proyectos', val:stats.proyectos,  color:'#7C3AED',       bg:'#EDE9FE'},
+    {label:'Socios',    val:stats.empresas,   color:'var(--green)',  bg:'var(--green-lt)'},
+    {label:'Asesores',  val:stats.asesores,   color:'var(--blue)',   bg:'var(--blue-lt)'},
+  ];
+
+  return (
+    <div className="fade-up">
+      {/* Stats 2×2 grid */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+        {cards.map(c=>(
+          <div key={c.label} className="card" style={{padding:'14px 16px',display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:40,height:40,borderRadius:10,background:c.bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <span style={{fontSize:20,fontWeight:800,color:c.color,lineHeight:1}}>{c.val}</span>
+            </div>
+            <span style={{fontSize:13,color:'var(--ink3)',fontWeight:500,lineHeight:1.2}}>{c.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Big CTA */}
+      <button className="btn btn-primary" onClick={()=>onNav('registro')}
+        style={{width:'100%',fontSize:16,padding:'15px',borderRadius:'var(--radius-lg)',marginBottom:16,gap:8,boxShadow:'0 4px 14px rgba(255,92,0,.25)'}}>
+        {React.cloneElement(I.plus,{width:20,height:20})}
+        Registrar nueva venta
+      </button>
+
+      {/* Recent sales */}
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'13px 16px',borderBottom:'1px solid var(--border)'}}>
+          <h3 style={{fontSize:14}}>Ventas recientes</h3>
+          <button onClick={()=>onNav('reportes')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--orange)',fontSize:13,fontWeight:600,fontFamily:'Plus Jakarta Sans'}}>Ver todas →</button>
+        </div>
+        {recent.length===0
+          ? <div style={{textAlign:'center',padding:'32px 16px',color:'var(--ink3)',fontSize:14}}>
+              Sin ventas aún. Usa el botón de arriba para empezar.
+            </div>
+          : <div>
+              {recent.map((v,i)=>(
+                <div key={v.id} style={{display:'flex',alignItems:'center',padding:'11px 16px',borderBottom:i<recent.length-1?'1px solid var(--border)':'none',gap:12}}>
+                  {/* Lote badge */}
+                  <div style={{width:40,height:40,borderRadius:10,background:'var(--orange-lt)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <span style={{fontFamily:'JetBrains Mono',fontSize:12,fontWeight:700,color:'var(--orange)',lineHeight:1,textAlign:'center',maxWidth:36,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v.lote}</span>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:600,fontSize:13,marginBottom:2,display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nameById(manzanas,v.manzanaId)}</span>
+                      <span style={{color:'var(--ink4)',flexShrink:0}}>·</span>
+                      <span style={{color:'var(--ink3)',fontWeight:400,fontSize:12,flexShrink:0}}>{nameById(etapas,v.etapaId)}</span>
+                    </div>
+                    <div style={{fontSize:11,color:'var(--ink4)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {nameById(empresas,v.empresaId)} · {nameById(asesores,v.asesorId)}
+                    </div>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--ink4)',flexShrink:0}}>{fmtShort(v.fecha)}</div>
+                </div>
+              ))}
+            </div>
+        }
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   REGISTRO DE VENTAS
+══════════════════════════════════════════ */
+function Registro({onSaved}) {
+  const [proyectos,setProyectos]=useState([]);
+  const [etapas,setEtapas]=useState([]);
+  const [manzanas,setManzanas]=useState([]);
+  const [empresas,setEmpresas]=useState([]);
+  const [asesores,setAsesores]=useState([]);
+  const [ventas,setVentas]=useState([]);
+
+  const [f,setF]=useState({proyectoId:'',etapaId:'',manzanaId:'',lote:'',fecha:todayStr(),empresaId:'',asesorId:''});
+  const [errs,setErrs]=useState({});
+  const [ok,setOk]=useState(false);
+  const [lotErr,setLotErr]=useState('');
+
+  useEffect(()=>{
+    (async()=>{
+      setProyectos(await db.proyectos.toArray());
+      setEtapas(await db.etapas.toArray());
+      setManzanas(await db.manzanas.toArray());
+      setEmpresas(await db.empresas.toArray());
+      setAsesores(await db.asesores.toArray());
+      setVentas(await db.ventas.toArray());
+    })();
+  },[]);
+
+  // Derived filtered lists
+  const etapasFilt = useMemo(()=>f.proyectoId?etapas.filter(e=>e.proyectoId===+f.proyectoId&&e.activa):[],[f.proyectoId,etapas]);
+  const manzanasFilt = useMemo(()=>f.etapaId?manzanas.filter(m=>m.etapaId===+f.etapaId):[],[f.etapaId,manzanas]);
+  const asesoresFilt = useMemo(()=>f.empresaId?asesores.filter(a=>a.empresaId===+f.empresaId):[],[f.empresaId,asesores]);
+
+  // Lotes info for selected manzana
+  const manzanaInfo = useMemo(()=>{
+    if(!f.manzanaId) return null;
+    const m = manzanas.find(x=>x.id===+f.manzanaId);
+    if(!m||!m.totalLotes) return null;
+    const vendidos = ventas.filter(v=>v.manzanaId===+f.manzanaId).length;
+    return {total:m.totalLotes, vendidos, disponibles:Math.max(0,m.totalLotes-vendidos)};
+  },[f.manzanaId,manzanas,ventas]);
+
+  const set = (k,v) => {
+    setF(prev=>{
+      const n={...prev,[k]:v};
+      if(k==='proyectoId'){n.etapaId='';n.manzanaId='';}
+      if(k==='etapaId'){n.manzanaId='';}
+      if(k==='empresaId'){n.asesorId='';}
+      return n;
+    });
+    setErrs(p=>({...p,[k]:false}));
+    if(k==='lote') setLotErr('');
+  };
+
+  const validateLote = lote => {
+    if(!f.manzanaId||!manzanaInfo) return true;
+    // Check if lote number exceeds available count
+    const n=parseInt(lote);
+    if(!isNaN(n) && n>manzanaInfo.total){
+      setLotErr(`El lote N°${n} supera el total de ${manzanaInfo.total} lotes en esta manzana`);
+      return false;
+    }
+    if(manzanaInfo.disponibles===0){
+      setLotErr('Esta manzana no tiene lotes disponibles');
+      return false;
+    }
+    // Check duplicate lote in same manzana
+    const dup = ventas.find(v=>v.manzanaId===+f.manzanaId && v.lote.trim().toLowerCase()===lote.trim().toLowerCase());
+    if(dup){ setLotErr(`El lote "${lote}" ya está registrado en esta manzana`); return false; }
+    return true;
+  };
+
+  const validate = () => {
+    const e={};
+    if(!f.proyectoId) e.proyectoId=true;
+    if(!f.etapaId)    e.etapaId=true;
+    if(!f.manzanaId)  e.manzanaId=true;
+    if(!f.lote.trim())e.lote=true;
+    if(!f.fecha)      e.fecha=true;
+    if(!f.empresaId)  e.empresaId=true;
+    if(!f.asesorId)   e.asesorId=true;
+    setErrs(e);
+    if(Object.keys(e).length>0) return false;
+    return validateLote(f.lote.trim());
+  };
+
+  const submit = async () => {
+    if(!validate()) return;
+    await db.ventas.add({
+      proyectoId:+f.proyectoId, etapaId:+f.etapaId, manzanaId:+f.manzanaId,
+      lote:f.lote.trim(), fecha:f.fecha,
+      empresaId:+f.empresaId, asesorId:+f.asesorId,
+      createdAt:new Date().toISOString()
+    });
+    // Refresh ventas
+    setVentas(await db.ventas.toArray());
+    setF({proyectoId:'',etapaId:'',manzanaId:'',lote:'',fecha:todayStr(),empresaId:'',asesorId:''});
+    setLotErr('');
+    setOk(true); setTimeout(()=>setOk(false),3000);
+    if(onSaved) onSaved();
+  };
+
+  const ic = k => errs[k]?'input err':'input';
+  const sc = k => errs[k]?'select err':'select';
+
+  const pct = manzanaInfo ? Math.min(100,Math.round((manzanaInfo.vendidos/manzanaInfo.total)*100)) : 0;
+
+  return (
+    <div className="fade-up">
+      <div className="card" style={{maxWidth:680,width:'100%'}}>
+        <h2 style={{marginBottom:4}}>Nueva Venta</h2>
+        <p style={{color:'var(--ink3)',fontSize:13,marginBottom:22}}>Completa todos los campos marcados con *</p>
+
+        {ok && <div className="success-box" style={{marginBottom:20,display:'flex',alignItems:'center',gap:8}}>{I.check} Venta registrada exitosamente</div>}
+        {lotErr && <div className="error-box" style={{marginBottom:20}}>{lotErr}</div>}
+
+        <div className="grid-2">
+          {/* Proyecto */}
+          <div className="field">
+            <label className={'label'+(errs.proyectoId?' err':'')}>Proyecto *</label>
+            <select className={sc('proyectoId')} value={f.proyectoId} onChange={e=>set('proyectoId',e.target.value)}>
+              <option value="">Seleccionar proyecto</option>
+              {proyectos.map(p=><option key={p.id} value={p.id}>{p.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Etapa */}
+          <div className="field">
+            <label className={'label'+(errs.etapaId?' err':'')}>Etapa (activas) *</label>
+            <select className={sc('etapaId')} value={f.etapaId} onChange={e=>set('etapaId',e.target.value)} disabled={!f.proyectoId}>
+              <option value="">{f.proyectoId?'Seleccionar etapa':'Primero selecciona proyecto'}</option>
+              {etapasFilt.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Manzana */}
+          <div className="field">
+            <label className={'label'+(errs.manzanaId?' err':'')}>Manzana *</label>
+            <select className={sc('manzanaId')} value={f.manzanaId} onChange={e=>set('manzanaId',e.target.value)} disabled={!f.etapaId}>
+              <option value="">{f.etapaId?'Seleccionar manzana':'Primero selecciona etapa'}</option>
+              {manzanasFilt.map(m=>{
+                const vend=ventas.filter(v=>v.manzanaId===m.id).length;
+                const disp=m.totalLotes?Math.max(0,m.totalLotes-vend):null;
+                return (
+                  <option key={m.id} value={m.id} disabled={disp===0}>
+                    {m.nombre}{m.totalLotes?` — ${disp} disp. de ${m.totalLotes}`:''}
+                  </option>
+                );
+              })}
+            </select>
+            {/* Lotes info card */}
+            {manzanaInfo && (
+              <div style={{marginTop:8,padding:'8px 10px',background:'var(--surface2)',borderRadius:8,fontSize:12}}>
+                <div style={{display:'flex',gap:10,marginBottom:4}}>
+                  <span style={{color:'var(--ink3)'}}>Total: <strong style={{color:'var(--ink)'}}>{manzanaInfo.total}</strong></span>
+                  <span style={{color:'var(--green)'}}>Disp: <strong>{manzanaInfo.disponibles}</strong></span>
+                  <span style={{color:'var(--orange)'}}>Vend: <strong>{manzanaInfo.vendidos}</strong></span>
+                </div>
+                <div className="lot-bar"><div className="lot-fill" style={{width:pct+'%',background:manzanaInfo.disponibles===0?'var(--red)':'var(--orange)'}}/></div>
+              </div>
+            )}
+          </div>
+
+          {/* Lote */}
+          <div className="field">
+            <label className={'label'+(errs.lote||lotErr?' err':'')}>Número de Lote *</label>
+            <input className={ic('lote')} value={f.lote} onChange={e=>{set('lote',e.target.value);setLotErr('');}}
+              onBlur={()=>f.lote.trim()&&validateLote(f.lote.trim())}
+              placeholder="Ej: 12, A-5, Lote 3B"
+              style={lotErr?{borderColor:'var(--red)'}:{}}
+            />
+            {manzanaInfo && <span style={{fontSize:11,color:'var(--ink3)'}}>Máx. lote válido: {manzanaInfo.total}</span>}
+          </div>
+
+          {/* Fecha */}
+          <div className="field">
+            <label className={'label'+(errs.fecha?' err':'')}>Fecha *</label>
+            <input type="date" className={ic('fecha')} value={f.fecha} onChange={e=>set('fecha',e.target.value)}/>
+          </div>
+
+          {/* Empresa */}
+          <div className="field">
+            <label className={'label'+(errs.empresaId?' err':'')}>Socio (Empresa) *</label>
+            <select className={sc('empresaId')} value={f.empresaId} onChange={e=>set('empresaId',e.target.value)}>
+              <option value="">Seleccionar empresa</option>
+              {empresas.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Asesor — filtrado por empresa */}
+          <div className="field">
+            <label className={'label'+(errs.asesorId?' err':'')}>Asesor *</label>
+            <select className={sc('asesorId')} value={f.asesorId} onChange={e=>set('asesorId',e.target.value)} disabled={!f.empresaId}>
+              <option value="">{f.empresaId?'Seleccionar asesor':'Primero selecciona empresa'}</option>
+              {asesoresFilt.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}
+            </select>
+            {f.empresaId && asesoresFilt.length===0 &&
+              <span style={{fontSize:11,color:'var(--red)'}}>Esta empresa no tiene asesores registrados</span>
+            }
+          </div>
+        </div>
+
+        <div style={{marginTop:24}}>
+          <button className="btn btn-primary" onClick={submit} style={{width:'100%',fontSize:15,padding:'12px'}}>
+            {I.check} Registrar Venta
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   REPORTES / VENTAS LISTADO
+══════════════════════════════════════════ */
+function Reportes({soloDosMeses}) {
+  const dosM = useMemo(()=>twoMonthsAgo(),[]);
+  const [ventas,setVentas]=useState([]);
+  const [proyectos,setProyectos]=useState([]);
+  const [etapas,setEtapas]=useState([]);
+  const [manzanas,setManzanas]=useState([]);
+  const [empresas,setEmpresas]=useState([]);
+  const [asesores,setAsesores]=useState([]);
+  const [filtros,setFiltros]=useState({desde:'',hasta:'',empresaId:'',asesorId:'',proyectoId:''});
+  const [open,setOpen]=useState(false);
+
+  useEffect(()=>{
+    (async()=>{
+      setVentas(await db.ventas.orderBy('fecha').toArray());
+      setProyectos(await db.proyectos.toArray());
+      setEtapas(await db.etapas.toArray());
+      setManzanas(await db.manzanas.toArray());
+      setEmpresas(await db.empresas.toArray());
+      setAsesores(await db.asesores.toArray());
+    })();
+  },[]);
+
+  const vf = useMemo(()=>ventas.filter(v=>{
+    // soloDosMeses ya no restringe — asesor ve todo, solo se quita el panel de filtros avanzados
+    if(filtros.desde && v.fecha<filtros.desde) return false;
+    if(filtros.hasta && v.fecha>filtros.hasta) return false;
+    if(filtros.empresaId && v.empresaId!==+filtros.empresaId) return false;
+    if(filtros.asesorId  && v.asesorId!==+filtros.asesorId)   return false;
+    if(filtros.proyectoId && v.proyectoId!==+filtros.proyectoId) return false;
+    return true;
+  }),[ventas,filtros]);
+
+  const groups = useMemo(()=>{
+    const m={};
+    vf.forEach(v=>{
+      const k=v.proyectoId+'-'+v.etapaId;
+      if(!m[k]) m[k]={pId:v.proyectoId,eId:v.etapaId,rows:[]};
+      m[k].rows.push(v);
+    });
+    return Object.values(m);
+  },[vf]);
+
+  const aFilt=[filtros.desde,filtros.hasta,filtros.empresaId,filtros.asesorId,filtros.proyectoId].filter(Boolean).length;
+  const setF=(k,v)=>setFiltros(f=>({...f,[k]:v}));
+  const clearF=()=>setFiltros({desde:'',hasta:'',empresaId:'',asesorId:'',proyectoId:''});
+
+  // Asesores filtrados por empresa seleccionada en filtro
+  const asesoresFiltF = useMemo(()=>filtros.empresaId?asesores.filter(a=>a.empresaId===+filtros.empresaId):asesores,[filtros.empresaId,asesores]);
+
+  const print=()=>{
+    const win=window.open('','_blank');
+    const rows=vf.map((v,i)=>`<tr style="border-bottom:1px solid #EEE"><td>${i+1}</td><td>${fmtDate(v.fecha)}</td><td>${nameById(proyectos,v.proyectoId)}</td><td>${nameById(etapas,v.etapaId)}</td><td>${nameById(manzanas,v.manzanaId)}</td><td style="font-family:monospace">${v.lote}</td><td>${nameById(empresas,v.empresaId)}</td><td>${nameById(asesores,v.asesorId)}</td></tr>`).join('');
+    const fa=[];
+    if(filtros.desde)fa.push('Desde: '+fmtDate(filtros.desde));
+    if(filtros.hasta)fa.push('Hasta: '+fmtDate(filtros.hasta));
+    if(filtros.empresaId)fa.push('Empresa: '+nameById(empresas,+filtros.empresaId));
+    if(filtros.asesorId)fa.push('Asesor: '+nameById(asesores,+filtros.asesorId));
+    if(filtros.proyectoId)fa.push('Proyecto: '+nameById(proyectos,+filtros.proyectoId));
+    win.document.write(`<!DOCTYPE html><html><head><title>Appari Leads — Reporte</title><style>body{font-family:system-ui;padding:24px;color:#1A1A1A}table{width:100%;border-collapse:collapse;font-size:12px}th{background:#FF5C00;color:#fff;padding:8px 10px;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact}.fil{background:#FFF3EC;border:1px solid #FFCBA4;border-radius:6px;padding:8px 12px;margin-bottom:14px;font-size:12px;color:#FF5C00}.sum{background:#FFF3EC;font-weight:700}.hdr{display:flex;justify-content:space-between;border-bottom:2px solid #FF5C00;margin-bottom:16px;padding-bottom:12px}</style></head><body><div class="hdr"><div style="display:flex;align-items:center;gap:10px"><svg width="28" height="28" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#FF5C00"/><path d="M10 22L16 10L22 22M12.5 18H19.5" stroke="white" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg><div style="font-size:18px;font-weight:800">Appari <span style="color:#FF5C00">Leads</span></div></div><div style="text-align:right;font-size:12px;color:#888">Total: <strong style="font-size:20px;color:#1A1A1A">${vf.length}</strong> ventas<br/>${new Date().toLocaleDateString('es-PE')}</div></div>${fa.length?`<div class="fil"><strong>Filtros:</strong> ${fa.join(' · ')}</div>`:''}<table><thead><tr><th>#</th><th>Fecha</th><th>Proyecto</th><th>Etapa</th><th>Manzana</th><th>Lote</th><th>Empresa</th><th>Asesor</th></tr></thead><tbody>${rows}<tr class="sum"><td colspan="8" style="padding:8px 10px;text-align:right">TOTAL: ${vf.length} ventas</td></tr></tbody></table></body></html>`);
+    win.document.close(); setTimeout(()=>win.print(),400);
+  };
+
+  return (
+    <div className="fade-up" style={{display:'flex',flexDirection:'column',gap:0}}>
+      {/* Top bar */}
+      <div className="card" style={{marginBottom:14,padding:'12px 16px'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{color:'var(--orange)',display:'flex'}}>{I.filter}</span>
+          <span style={{fontWeight:700,fontSize:14,flex:1}}>
+            Filtros {aFilt>0&&<span className="badge badge-orange" style={{marginLeft:6}}>{aFilt}</span>}
+          </span>
+          <button className="btn-icon" onClick={()=>setOpen(o=>!o)} style={{color:'var(--orange)'}}>
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">{open?<polyline points="18 15 12 9 6 15"/>:<polyline points="6 9 12 15 18 9"/>}</svg>
+          </button>
+          {aFilt>0&&<button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px',minHeight:30}} onClick={clearF}>Limpiar</button>}
+          <button className="btn btn-primary" style={{fontSize:12,padding:'6px 12px',minHeight:32,gap:5}} onClick={print}>{I.dl} PDF</button>
+        </div>
+
+        {open && (
+          <div className="grid-4" style={{marginTop:14}}>
+            {[{k:'desde',l:'Desde',t:'date'},{k:'hasta',l:'Hasta',t:'date'},{k:'proyectoId',l:'Proyecto',t:'sel',opts:proyectos},{k:'empresaId',l:'Empresa',t:'sel',opts:empresas},{k:'asesorId',l:'Asesor',t:'sel',opts:asesoresFiltF}].map(x=>(
+              <div key={x.k} className="field">
+                <label className="label" style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.05em'}}>{x.l}</label>
+                {x.t==='date'
+                  ? <input type="date" className="input" style={{fontSize:13,minHeight:36}} value={filtros[x.k]} onChange={e=>setF(x.k,e.target.value)}/>
+                  : <select className="select" style={{fontSize:13,minHeight:36}} value={filtros[x.k]} onChange={e=>setF(x.k,e.target.value)}><option value="">Todos</option>{x.opts?.map(o=><option key={o.id} value={o.id}>{o.nombre}</option>)}</select>
+                }
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Count */}
+      <div style={{marginBottom:12,fontSize:13,color:'var(--ink3)'}}>
+        <strong style={{color:'var(--ink)',fontSize:15}}>{vf.length}</strong> venta{vf.length!==1?'s':''}
+        {groups.length>1&&` en ${groups.length} grupos`}
+      </div>
+
+      {/* Empty */}
+      {ventas.length===0 && (
+        <div className="card" style={{textAlign:'center',padding:'48px 24px'}}>
+          <div style={{fontSize:40,marginBottom:12}}>📋</div>
+          <h3>Sin ventas registradas</h3>
+          <p style={{color:'var(--ink3)',fontSize:13,marginTop:6}}>Usa el formulario de Nueva Venta para empezar</p>
+        </div>
+      )}
+      {ventas.length>0 && vf.length===0 && (
+        <div className="card" style={{textAlign:'center',padding:'36px 24px'}}>
+          <h3>Sin resultados</h3>
+          <p style={{color:'var(--ink3)',fontSize:13,marginTop:6}}>Ajusta o limpia los filtros</p>
+        </div>
+      )}
+
+      {/* Groups */}
+      <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        {groups.map(g=>{
+          const proy=byId(proyectos,g.pId), etapa=byId(etapas,g.eId);
+          return (
+            <div key={g.pId+'-'+g.eId} className="card" style={{padding:0,overflow:'hidden'}}>
+              <div style={{padding:'10px 16px',background:'var(--surface2)',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                <span style={{color:'var(--orange)',display:'flex'}}>{I.layers}</span>
+                <span style={{fontWeight:700,fontSize:14}}>{proy?.nombre||'-'}</span>
+                <span style={{color:'var(--ink4)'}}>›</span>
+                <span style={{fontSize:14,fontWeight:600,color:'var(--ink2)'}}>{etapa?.nombre||'-'}</span>
+                <span className="badge badge-orange" style={{marginLeft:'auto'}}>{g.rows.length} ventas</span>
+              </div>
+
+              {/* Mobile list */}
+              <div className="mob-list">
+                {g.rows.map((v,i)=>(
+                  <div key={v.id} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 16px',borderBottom:i<g.rows.length-1?'1px solid var(--border)':'none'}}>
+                    <div style={{width:38,height:38,borderRadius:10,background:'var(--orange-lt)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                      <span style={{fontFamily:'JetBrains Mono',fontSize:11,fontWeight:700,color:'var(--orange)',lineHeight:1,textAlign:'center',maxWidth:34,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{v.lote}</span>
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{nameById(manzanas,v.manzanaId)}</div>
+                      <div style={{fontSize:11,color:'var(--ink3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                        {fmtShort(v.fecha)} · {nameById(empresas,v.empresaId)} · {nameById(asesores,v.asesorId)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div style={{padding:'10px 16px',background:'var(--orange-lt)',borderTop:'2px solid var(--orange-md)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                  <span style={{fontSize:13,fontWeight:700,color:'var(--orange)'}}>Total {etapa?.nombre}</span>
+                  <span style={{fontSize:13,fontWeight:700,color:'var(--orange)'}}>{g.rows.length} venta{g.rows.length!==1?'s':''}</span>
+                </div>
+              </div>
+
+              {/* Desktop table */}
+              <div className="desk-table tbl-wrap">
+                <table className="tbl">
+                  <thead><tr>{['#','Fecha','Proyecto','Etapa','Manzana','Lote','Empresa','Asesor'].map(h=><th key={h}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {g.rows.map((v,i)=>(
+                      <tr key={v.id}>
+                        <td style={{color:'var(--ink4)',fontSize:12}}>{i+1}</td>
+                        <td style={{color:'var(--ink3)',whiteSpace:'nowrap'}}>{fmtDate(v.fecha)}</td>
+                        <td style={{fontWeight:500}}>{nameById(proyectos,v.proyectoId)}</td>
+                        <td>{nameById(etapas,v.etapaId)}</td>
+                        <td>{nameById(manzanas,v.manzanaId)}</td>
+                        <td><span style={{fontFamily:'JetBrains Mono',color:'var(--orange)',fontWeight:500}}>{v.lote}</span></td>
+                        <td>{nameById(empresas,v.empresaId)}</td>
+                        <td>{nameById(asesores,v.asesorId)}</td>
+                      </tr>
+                    ))}
+                    <tr className="tbl-sum">
+                      <td colSpan="8" style={{textAlign:'right',padding:'10px 14px'}}>
+                        <span style={{color:'var(--orange)'}}>Total {etapa?.nombre}: </span>
+                        <strong>{g.rows.length} ventas</strong>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+        {groups.length>1 && (
+          <div style={{padding:'12px 18px',background:'var(--orange-lt)',border:'1px solid var(--orange-md)',borderRadius:var_r,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <span style={{fontWeight:700,color:'var(--orange)'}}>Total general</span>
+            <span style={{fontSize:20,fontWeight:800,color:'var(--orange)'}}>{vf.length} ventas</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+const var_r='var(--radius-lg)';
+
+/* ══════════════════════════════════════════
+   CONFIG — SOCIOS (Empresas + Asesores)
+══════════════════════════════════════════ */
+function ConfigSocios() {
+  const [empresas,setEmpresas]=useState([]);
+  const [asesores,setAsesores]=useState([]);
+  const [modal,setModal]=useState(null); // null | {type:'empresa'|'asesor', edit?:obj, empresaId?:number}
+  const [form,setForm]=useState({nombre:'',empresaId:''});
+  const [expanded,setExpanded]=useState({});
+
+  const load = async () => {
+    setEmpresas(await db.empresas.toArray());
+    setAsesores(await db.asesores.toArray());
+  };
+  useEffect(()=>{load();},[]);
+
+  const toggle = id => setExpanded(p=>({...p,[id]:!p[id]}));
+
+  const openModal = (type, opts={}) => {
+    setModal({type,...opts});
+    setForm({nombre:opts.edit?.nombre||'', empresaId:opts.empresaId||opts.edit?.empresaId||''});
+  };
+
+  const save = async () => {
+    if(!form.nombre.trim()) return;
+    if(modal.type==='empresa') {
+      if(modal.edit) await db.empresas.update(modal.edit.id,{nombre:form.nombre.trim()});
+      else await db.empresas.add({nombre:form.nombre.trim()});
+    } else {
+      if(!form.empresaId) return;
+      if(modal.edit) await db.asesores.update(modal.edit.id,{nombre:form.nombre.trim(),empresaId:+form.empresaId});
+      else await db.asesores.add({nombre:form.nombre.trim(),empresaId:+form.empresaId});
+    }
+    setModal(null); load();
+  };
+
+  const delEmpresa = async id => {
+    const tiene = asesores.some(a=>a.empresaId===id);
+    if(tiene && !confirm('Esta empresa tiene asesores asociados. ¿Eliminar junto con sus asesores?')) return;
+    if(!tiene && !confirm('¿Eliminar esta empresa?')) return;
+    await db.asesores.where('empresaId').equals(id).delete();
+    await db.empresas.delete(id); load();
+  };
+
+  const delAsesor = async id => {
+    if(!confirm('¿Eliminar asesor?')) return;
+    await db.asesores.delete(id); load();
+  };
+
+  return (
+    <div className="fade-up" style={{maxWidth:580}}>
+      <div className="sec-head">
+        <div>
+          <h3>Socios y Asesores</h3>
+          <p style={{fontSize:13,color:'var(--ink3)',marginTop:2}}>Cada socio (empresa) tiene su propio grupo de asesores</p>
+        </div>
+        <button className="btn btn-primary" style={{gap:5}} onClick={()=>openModal('empresa')}>{I.plus} Nueva empresa</button>
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {empresas.map(emp=>{
+          const subs = asesores.filter(a=>a.empresaId===emp.id);
+          const isOpen = expanded[emp.id];
+          return (
+            <div key={emp.id} className="card" style={{padding:0,overflow:'hidden'}}>
+              {/* Empresa header */}
+              <div style={{display:'flex',alignItems:'center',gap:10,padding:'13px 16px',cursor:'pointer',background:'var(--surface)'}} onClick={()=>toggle(emp.id)}>
+                <div style={{width:34,height:34,borderRadius:9,background:'var(--orange-lt)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--orange)',flexShrink:0}}>{I.building}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:15}}>{emp.nombre}</div>
+                  <div style={{fontSize:12,color:'var(--ink3)'}}>{subs.length} asesor{subs.length!==1?'es':''}</div>
+                </div>
+                <div style={{display:'flex',gap:2,alignItems:'center'}}>
+                  <button className="btn-icon" onClick={e=>{e.stopPropagation();openModal('asesor',{empresaId:emp.id})}} title="Agregar asesor" style={{color:'var(--orange)'}}>{I.plus}</button>
+                  <button className="btn-icon" onClick={e=>{e.stopPropagation();openModal('empresa',{edit:emp})}}>{I.edit}</button>
+                  <button className="btn-icon danger" onClick={e=>{e.stopPropagation();delEmpresa(emp.id)}}>{I.trash}</button>
+                  <span style={{color:'var(--ink4)',marginLeft:4,transition:'transform .15s',display:'inline-flex',transform:isOpen?'rotate(90deg)':'rotate(0deg)'}}>{I.chevR}</span>
+                </div>
+              </div>
+
+              {/* Asesores list */}
+              {isOpen && (
+                <div style={{borderTop:'1px solid var(--border)',background:'var(--surface2)'}}>
+                  {subs.length===0
+                    ? <div style={{padding:'12px 16px',fontSize:13,color:'var(--ink3)',fontStyle:'italic'}}>Sin asesores — usa el botón + para agregar</div>
+                    : subs.map((a,i)=>(
+                        <div key={a.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',borderBottom:i<subs.length-1?'1px solid var(--border)':'none'}}>
+                          <div style={{width:28,height:28,borderRadius:8,background:'var(--blue-lt)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--blue)',flexShrink:0}}>{I.user}</div>
+                          <span style={{flex:1,fontSize:14,fontWeight:500}}>{a.nombre}</span>
+                          <span className="badge badge-gray" style={{fontSize:10}}>{emp.nombre}</span>
+                          <button className="btn-icon" onClick={()=>openModal('asesor',{edit:a,empresaId:a.empresaId})}>{I.edit}</button>
+                          <button className="btn-icon danger" onClick={()=>delAsesor(a.id)}>{I.trash}</button>
+                        </div>
+                      ))
+                  }
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {empresas.length===0 && <div className="card" style={{textAlign:'center',padding:'32px',color:'var(--ink3)',fontSize:14}}>Sin socios registrados. Agrega el primero.</div>}
+      </div>
+
+      {modal && (
+        <Modal title={modal.type==='empresa'?(modal.edit?'Editar empresa':'Nueva empresa'):(modal.edit?'Editar asesor':'Nuevo asesor')} onClose={()=>setModal(null)}>
+          {modal.type==='asesor' && (
+            <div className="field" style={{marginBottom:14}}>
+              <label className="label">Empresa</label>
+              <select className="select" value={form.empresaId} onChange={e=>setForm(f=>({...f,empresaId:e.target.value}))}>
+                <option value="">Seleccionar empresa</option>
+                {empresas.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
+              </select>
+            </div>
+          )}
+          <div className="field" style={{marginBottom:20}}>
+            <label className="label">Nombre</label>
+            <input className="input" value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))}
+              placeholder={modal.type==='empresa'?'Nombre de la empresa':'Nombre del asesor'}
+              autoFocus onKeyDown={e=>e.key==='Enter'&&save()}/>
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(null)}>Cancelar</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={save}>{I.check} Guardar</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   CONFIG — PROYECTOS (Jerarquía)
+══════════════════════════════════════════ */
+function ManzanaCard({m,ventas,onEdit,onDel}) {
+  const vend = ventas.filter(v=>v.manzanaId===m.id).length;
+  const total = m.totalLotes||0;
+  const disp = Math.max(0,total-vend);
+  const pct = total>0?Math.min(100,Math.round(vend/total*100)):0;
+  const agot = total>0&&disp===0;
+  return (
+    <div style={{padding:'12px 14px',borderRadius:var_r,background:'var(--surface)',border:`1px solid ${agot?'#FECACA':'var(--border)'}`,marginBottom:8}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:total>0?8:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:14,fontWeight:700}}>{m.nombre}</span>
+          {agot&&<span className="badge badge-red">Agotada</span>}
+        </div>
+        <div style={{display:'flex',gap:2}}>
+          <button className="btn-icon" onClick={onEdit}>{I.edit}</button>
+          <button className="btn-icon danger" onClick={onDel}>{I.trash}</button>
+        </div>
+      </div>
+      {total>0 ? (
+        <>
+          <div style={{display:'flex',gap:8,marginBottom:6,flexWrap:'wrap'}}>
+            <span style={{fontSize:11,fontWeight:700,background:'var(--surface3)',color:'var(--ink2)',borderRadius:6,padding:'2px 7px'}}>Total: {total}</span>
+            <span style={{fontSize:11,fontWeight:700,background:'var(--green-lt)',color:'var(--green)',borderRadius:6,padding:'2px 7px'}}>Disp: {disp}</span>
+            <span style={{fontSize:11,fontWeight:700,background:'var(--orange-lt)',color:'var(--orange)',borderRadius:6,padding:'2px 7px'}}>Vend: {vend}</span>
+          </div>
+          <div className="lot-bar"><div className="lot-fill" style={{width:pct+'%',background:agot?'var(--red)':'var(--orange)'}}/></div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'var(--ink4)',marginTop:3}}>
+            <span>0</span>
+            <span style={{color:pct>=90?'var(--red)':'var(--ink4)',fontWeight:pct>=90?700:400}}>{pct}% vendido</span>
+            <span>{total}</span>
+          </div>
+        </>
+      ):(
+        <p style={{fontSize:11,color:'var(--ink4)',fontStyle:'italic',margin:0}}>Sin total configurado — edita para agregar</p>
+      )}
+    </div>
+  );
+}
+
+function ConfigProyectos() {
+  const [proyectos,setProyectos]=useState([]);
+  const [etapas,setEtapas]=useState([]);
+  const [manzanas,setManzanas]=useState([]);
+  const [ventas,setVentas]=useState([]);
+  const [selProy,setSelProy]=useState(null);
+  const [selEtapa,setSelEtapa]=useState(null);
+  const [modal,setModal]=useState(null);
+  const [form,setForm]=useState({nombre:'',activa:true,totalLotes:''});
+  const [editId,setEditId]=useState(null);
+  const [mStep,setMStep]=useState(0); // mobile drill
+
+  const load = async ()=>{
+    setProyectos(await db.proyectos.toArray());
+    setEtapas(await db.etapas.toArray());
+    setManzanas(await db.manzanas.toArray());
+    setVentas(await db.ventas.toArray());
+  };
+  useEffect(()=>{load();},[]);
+
+  const etapasDe = selProy?etapas.filter(e=>e.proyectoId===selProy.id):[];
+  const manzanasDe = selEtapa?manzanas.filter(m=>m.etapaId===selEtapa.id):[];
+
+  const open = (type,edit=null) => {
+    setModal(type); setEditId(edit?.id||null);
+    setForm({nombre:edit?.nombre||'',activa:edit?.activa!==false,totalLotes:edit?.totalLotes||''});
+  };
+
+  const save = async () => {
+    if(!form.nombre.trim()) return;
+    if(modal==='proyecto'){
+      if(editId) await db.proyectos.update(editId,{nombre:form.nombre});
+      else await db.proyectos.add({nombre:form.nombre});
+    } else if(modal==='etapa'){
+      if(editId) await db.etapas.update(editId,{nombre:form.nombre,activa:!!form.activa});
+      else await db.etapas.add({proyectoId:selProy.id,nombre:form.nombre,activa:!!form.activa});
+    } else if(modal==='manzana'){
+      const tl=parseInt(form.totalLotes)||0;
+      if(editId) await db.manzanas.update(editId,{nombre:form.nombre,totalLotes:tl});
+      else await db.manzanas.add({etapaId:selEtapa.id,nombre:form.nombre,totalLotes:tl});
+    }
+    setModal(null); load();
+  };
+
+  const del = async (type,id) => {
+    if(!confirm('¿Eliminar?')) return;
+    if(type==='proyecto'){await db.proyectos.delete(id);if(selProy?.id===id){setSelProy(null);setSelEtapa(null);setMStep(0);}}
+    else if(type==='etapa'){await db.etapas.delete(id);if(selEtapa?.id===id){setSelEtapa(null);setMStep(1);}}
+    else await db.manzanas.delete(id);
+    load();
+  };
+
+  const toggleActiva = async e => { await db.etapas.update(e.id,{activa:!e.activa}); load(); };
+
+  /* ── Shared column panel ── */
+  const Panel = ({title,onAdd,children,onBack}) => (
+    <div className="card" style={{padding:0,overflow:'hidden'}}>
+      <div className="drill-head">
+        {onBack&&<button className="btn-icon" onClick={onBack}>{I.back}</button>}
+        <h3 style={{flex:1,fontSize:14}}>{title}</h3>
+        {onAdd&&<button className="btn btn-primary" style={{padding:'5px 10px',fontSize:12,minHeight:30,gap:4}} onClick={onAdd}>{I.plus} Nuevo</button>}
+      </div>
+      <div className="drill-body">{children}</div>
+    </div>
+  );
+
+  const PRow = ({item,isSel,onClick,onEdit,onDel,extra}) => (
+    <div onClick={onClick} style={{display:'flex',alignItems:'center',gap:8,padding:'9px 10px',borderRadius:var_r,cursor:'pointer',minHeight:44,
+      background:isSel?'var(--orange-lt)':'var(--surface3)',border:isSel?'1px solid var(--orange-md)':'1px solid transparent',transition:'all .1s'}}>
+      <div style={{flex:1,minWidth:0}}>{extra||<span style={{fontSize:14,fontWeight:500,color:isSel?'var(--orange)':'var(--ink)'}}>{item.nombre}</span>}</div>
+      <div style={{display:'flex',gap:2,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+        <button className="btn-icon" onClick={()=>onEdit()}>{I.edit}</button>
+        <button className="btn-icon danger" onClick={()=>onDel()}>{I.trash}</button>
+      </div>
+    </div>
+  );
+
+  /* ── Desktop 3 columns ── */
+  const Desktop = () => (
+    <div className="proy-grid">
+      <Panel title="Proyectos" onAdd={()=>open('proyecto')}>
+        {proyectos.map(p=><PRow key={p.id} item={p} isSel={selProy?.id===p.id} onClick={()=>{setSelProy(p);setSelEtapa(null);}} onEdit={()=>open('proyecto',p)} onDel={()=>del('proyecto',p.id)}/>)}
+        {proyectos.length===0&&<p style={{fontSize:13,color:'var(--ink3)',textAlign:'center',padding:'16px 0'}}>Sin proyectos</p>}
+      </Panel>
+
+      <Panel title={selProy?`Etapas — ${selProy.nombre}`:'Etapas'} onAdd={selProy?()=>open('etapa'):null}>
+        {!selProy?<p style={{fontSize:13,color:'var(--ink3)',textAlign:'center',padding:'16px 0'}}>Selecciona un proyecto</p>
+        :etapasDe.length===0?<p style={{fontSize:13,color:'var(--ink3)',textAlign:'center',padding:'16px 0'}}>Sin etapas</p>
+        :etapasDe.map(e=>(
+          <PRow key={e.id} item={e} isSel={selEtapa?.id===e.id} onClick={()=>setSelEtapa(e)} onEdit={()=>open('etapa',e)} onDel={()=>del('etapa',e.id)}
+            extra={<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <span style={{fontSize:14,fontWeight:500}}>{e.nombre}</span>
+              <span className={`badge ${e.activa?'badge-green':'badge-gray'}`}>{e.activa?'Activa':'Inactiva'}</span>
+              <label className="toggle" onClick={ev=>ev.stopPropagation()}>
+                <input type="checkbox" checked={!!e.activa} onChange={()=>toggleActiva(e)}/>
+                <div className="toggle-track"><div className="toggle-thumb"/></div>
+              </label>
+            </div>}
+          />
+        ))}
+      </Panel>
+
+      <Panel title={selEtapa?`Manzanas — ${selEtapa.nombre}`:'Manzanas'} onAdd={selEtapa?()=>open('manzana'):null}>
+        {!selEtapa?<p style={{fontSize:13,color:'var(--ink3)',textAlign:'center',padding:'16px 0'}}>Selecciona una etapa</p>
+        :manzanasDe.length===0?<p style={{fontSize:13,color:'var(--ink3)',textAlign:'center',padding:'16px 0'}}>Sin manzanas</p>
+        :manzanasDe.map(m=><ManzanaCard key={m.id} m={m} ventas={ventas} onEdit={()=>open('manzana',m)} onDel={()=>del('manzana',m.id)}/>)
+        }
+      </Panel>
+    </div>
+  );
+
+  /* ── Mobile drill-down ── */
+  const Mobile = () => (
+    <div>
+      {/* Breadcrumb */}
+      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14,fontSize:13,flexWrap:'wrap'}}>
+        <button onClick={()=>setMStep(0)} style={{background:'none',border:'none',cursor:'pointer',color:mStep===0?'var(--orange)':'var(--ink3)',fontWeight:mStep===0?700:400,fontFamily:'Plus Jakarta Sans',fontSize:13,padding:0}}>Proyectos</button>
+        {mStep>=1&&<><span style={{color:'var(--ink4)'}}>/</span><button onClick={()=>setMStep(1)} style={{background:'none',border:'none',cursor:'pointer',color:mStep===1?'var(--orange)':'var(--ink3)',fontWeight:mStep===1?700:400,fontFamily:'Plus Jakarta Sans',fontSize:13,padding:0}}>{selProy?.nombre||'Etapas'}</button></>}
+        {mStep>=2&&<><span style={{color:'var(--ink4)'}}>/</span><span style={{color:'var(--orange)',fontWeight:700,fontSize:13}}>{selEtapa?.nombre}</span></>}
+      </div>
+
+      {mStep===0&&(
+        <Panel title="Proyectos" onAdd={()=>open('proyecto')}>
+          {proyectos.map(p=>(
+            <div key={p.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:var_r,background:'var(--surface3)',marginBottom:6,minHeight:48}}>
+              <button onClick={()=>{setSelProy(p);setSelEtapa(null);setMStep(1);}} style={{flex:1,background:'none',border:'none',cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:8,fontFamily:'Plus Jakarta Sans',fontSize:14,fontWeight:600,padding:0}}>
+                {p.nombre} <span style={{color:'var(--ink4)'}}>{I.chevR}</span>
+              </button>
+              <button className="btn-icon" onClick={()=>open('proyecto',p)}>{I.edit}</button>
+              <button className="btn-icon danger" onClick={()=>del('proyecto',p.id)}>{I.trash}</button>
+            </div>
+          ))}
+          {proyectos.length===0&&<p style={{fontSize:13,color:'var(--ink3)',textAlign:'center',padding:'16px 0'}}>Sin proyectos</p>}
+        </Panel>
+      )}
+      {mStep===1&&selProy&&(
+        <Panel title={`Etapas — ${selProy.nombre}`} onAdd={()=>open('etapa')} onBack={()=>setMStep(0)}>
+          {etapasDe.map(e=>(
+            <div key={e.id} style={{padding:'10px 12px',borderRadius:var_r,background:'var(--surface3)',marginBottom:6}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                <button onClick={()=>{setSelEtapa(e);setMStep(2);}} style={{flex:1,background:'none',border:'none',cursor:'pointer',textAlign:'left',display:'flex',alignItems:'center',gap:8,fontFamily:'Plus Jakarta Sans',fontSize:14,fontWeight:600,padding:0}}>
+                  {e.nombre} <span className={`badge ${e.activa?'badge-green':'badge-gray'}`}>{e.activa?'Activa':'Inactiva'}</span> {I.chevR}
+                </button>
+                <label className="toggle" onClick={ev=>ev.stopPropagation()}>
+                  <input type="checkbox" checked={!!e.activa} onChange={()=>toggleActiva(e)}/>
+                  <div className="toggle-track"><div className="toggle-thumb"/></div>
+                </label>
+                <button className="btn-icon" onClick={()=>open('etapa',e)}>{I.edit}</button>
+                <button className="btn-icon danger" onClick={()=>del('etapa',e.id)}>{I.trash}</button>
+              </div>
+            </div>
+          ))}
+          {etapasDe.length===0&&<p style={{fontSize:13,color:'var(--ink3)',textAlign:'center',padding:'16px 0'}}>Sin etapas</p>}
+        </Panel>
+      )}
+      {mStep===2&&selEtapa&&(
+        <Panel title={`Manzanas — ${selEtapa.nombre}`} onAdd={()=>open('manzana')} onBack={()=>setMStep(1)}>
+          {manzanasDe.map(m=><ManzanaCard key={m.id} m={m} ventas={ventas} onEdit={()=>open('manzana',m)} onDel={()=>del('manzana',m.id)}/>)}
+          {manzanasDe.length===0&&<p style={{fontSize:13,color:'var(--ink3)',textAlign:'center',padding:'16px 0'}}>Sin manzanas</p>}
+        </Panel>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="fade-up">
+      <div className="proy-desktop"><Desktop/></div>
+      <div className="proy-mobile"><Mobile/></div>
+
+      {modal&&(
+        <Modal title={(editId?'Editar ':'Nuevo/a ')+modal.charAt(0).toUpperCase()+modal.slice(1)} onClose={()=>setModal(null)}>
+          <div className="field" style={{marginBottom:14}}>
+            <label className="label">Nombre</label>
+            <input className="input" value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))} placeholder={`Nombre de la/el ${modal}`} autoFocus onKeyDown={e=>e.key==='Enter'&&save()}/>
+          </div>
+          {modal==='etapa'&&(
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,padding:'10px 12px',background:'var(--surface3)',borderRadius:var_r}}>
+              <label className="toggle"><input type="checkbox" checked={!!form.activa} onChange={e=>setForm(f=>({...f,activa:e.target.checked}))}/><div className="toggle-track"><div className="toggle-thumb"/></div></label>
+              <span style={{fontSize:14}}>Etapa activa</span>
+            </div>
+          )}
+          {modal==='manzana'&&(
+            <div className="field" style={{marginBottom:14}}>
+              <label className="label">Total de lotes</label>
+              <input type="number" min="0" inputMode="numeric" className="input" value={form.totalLotes} onChange={e=>setForm(f=>({...f,totalLotes:e.target.value}))} placeholder="Ej: 50"/>
+              <span style={{fontSize:11,color:'var(--ink3)'}}>Define el máximo para validar registros</span>
+            </div>
+          )}
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(null)}>Cancelar</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={save}>{I.check} Guardar</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   CONFIG — PINs
+══════════════════════════════════════════ */
+function ConfigPins({currentRol}) {
+  const [pins,setPins]=useState({admin:'',asesor:''});
+  const [modal,setModal]=useState(null); // 'admin'|'asesor'
+  const [p1,setP1]=useState(['','','','','','']);
+  const [p2,setP2]=useState(['','','','','','']);
+  const [err,setErr]=useState('');
+  const refs1=useRef([]), refs2=useRef([]);
+
+  const load = async ()=>{
+    const a=await db.config.get('admin_pin');
+    const b=await db.config.get('asesor_pin');
+    setPins({admin:a?.value||'',asesor:b?.value||''});
+  };
+  useEffect(()=>{load();},[]);
+
+  const openModal = rol => { setModal(rol); setP1(['','','','','','']); setP2(['','','','','','']); setErr(''); };
+
+  const handleDigit=(arr,setArr,refs,i,v)=>{
+    if(!/^\d?$/.test(v)) return;
+    const n=[...arr]; n[i]=v; setArr(n); setErr('');
+    if(v&&i<5) setTimeout(()=>refs.current[i+1]?.focus(),10);
+  };
+  const handleKey=(arr,setArr,refs,i,e)=>{
+    if(e.key==='Backspace'&&!arr[i]&&i>0){const n=[...arr];n[i-1]='';setArr(n);setTimeout(()=>refs.current[i-1]?.focus(),10);}
+    if(e.key==='ArrowLeft'&&i>0) refs.current[i-1]?.focus();
+    if(e.key==='ArrowRight'&&i<5) refs.current[i+1]?.focus();
+  };
+
+  const PinRow = ({arr,setArr,refs,label}) => (
+    <div className="field" style={{marginBottom:14}}>
+      <label className="label">{label}</label>
+      <div style={{display:'flex',gap:8}}>
+        {arr.map((v,i)=>(
+          <input key={i} ref={el=>refs.current[i]=el} type="text" inputMode="numeric" maxLength={1}
+            value={v} onChange={e=>handleDigit(arr,setArr,refs,i,e.target.value)}
+            onKeyDown={e=>handleKey(arr,setArr,refs,i,e)} onFocus={e=>e.target.select()}
+            style={{flex:1,height:44,border:`1.5px solid ${err?'var(--red)':'var(--border)'}`,borderRadius:var_r,textAlign:'center',fontFamily:'JetBrains Mono',fontSize:20,fontWeight:600,outline:'none',background:'var(--surface)',color:'var(--ink)',transition:'border-color .12s',WebkitAppearance:'none'}}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  const save = async ()=>{
+    const pin1=p1.join(''), pin2=p2.join('');
+    if(pin1.length<6){setErr('El PIN debe tener 6 dígitos');return;}
+    if(pin1!==pin2){setErr('Los PINs no coinciden');return;}
+    // Check not same as other role
+    const otherKey = modal==='admin'?'asesor_pin':'admin_pin';
+    const other = await db.config.get(otherKey);
+    if(other?.value===pin1){setErr('Este PIN ya lo usa el otro acceso');return;}
+    await db.config.put({key:modal==='admin'?'admin_pin':'asesor_pin',value:pin1});
+    setModal(null); load();
+  };
+
+  const roles=[{k:'admin',label:'Administrador',badge:'badge-orange'},{k:'asesor',label:'Asesor',badge:'badge-blue'}];
+
+  return (
+    <div className="fade-up" style={{maxWidth:480}}>
+      <div style={{marginBottom:18}}>
+        <h3>Accesos PIN</h3>
+        <p style={{fontSize:13,color:'var(--ink3)',marginTop:4}}>PIN de 6 dígitos para cada rol. Clic en la llave para cambiar.</p>
+      </div>
+      <div className="info-box" style={{marginBottom:18}}>
+        PINs por defecto — Administrador: <strong>111111</strong> · Asesor: <strong>000000</strong>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:10}}>
+        {roles.map(r=>(
+          <div key={r.k} style={{display:'flex',alignItems:'center',gap:12,padding:'14px 16px',borderRadius:var_r,border:`1px solid ${currentRol===r.k?'var(--orange-md)':'var(--border)'}`,background:currentRol===r.k?'var(--orange-lt)':'var(--surface)'}}>
+            <div style={{width:40,height:40,borderRadius:10,background:r.badge==='badge-orange'?'var(--orange-lt)':'var(--blue-lt)',display:'flex',alignItems:'center',justifyContent:'center',color:r.badge==='badge-orange'?'var(--orange)':'var(--blue)',flexShrink:0}}>
+              {r.k==='admin'?I.gear:I.user}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
+                <span style={{fontWeight:700,fontSize:15}}>{r.label}</span>
+                {currentRol===r.k&&<span className="badge badge-orange" style={{fontSize:10}}>Sesión activa</span>}
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span className={`badge ${r.badge}`}>{r.k==='admin'?'Admin':'Asesor'}</span>
+                <span style={{fontFamily:'JetBrains Mono',fontSize:12,color:'var(--ink4)',letterSpacing:3}}>●●●●●●</span>
+              </div>
+            </div>
+            <button className="btn-icon" style={{color:'var(--blue)',background:'var(--blue-lt)',borderRadius:10,width:38,height:38}} onClick={()=>openModal(r.k)} title="Cambiar PIN">{I.key}</button>
+          </div>
+        ))}
+      </div>
+
+      {modal&&(
+        <Modal title={`Cambiar PIN — ${modal==='admin'?'Administrador':'Asesor'}`} onClose={()=>setModal(null)}>
+          <PinRow arr={p1} setArr={setP1} refs={refs1} label="Nuevo PIN"/>
+          <PinRow arr={p2} setArr={setP2} refs={refs2} label="Confirmar PIN"/>
+          {err&&<div className="error-box" style={{marginBottom:14}}>{err}</div>}
+          <div style={{display:'flex',gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setModal(null)}>Cancelar</button>
+            <button className="btn btn-primary" style={{flex:2}} onClick={save}>{I.check} Guardar PIN</button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   CONFIGURACIÓN (tabs)
+══════════════════════════════════════════ */
+function Config({currentRol}) {
+  const [tab,setTab]=useState('socios');
+  const tabs=[
+    {id:'socios',  label:'Socios',    icon:I.building},
+    {id:'proyectos',label:'Proyectos',icon:I.layers},
+    {id:'pines',   label:'Accesos PIN',icon:I.key},
+  ];
+  return (
+    <div className="fade-up">
+      <div style={{display:'flex',gap:6,marginBottom:22,flexWrap:'wrap'}}>
+        {tabs.map(t=>(
+          <button key={t.id} className={`btn ${tab===t.id?'btn-primary':'btn-ghost'}`} style={{fontSize:13,gap:5}} onClick={()=>setTab(t.id)}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+      {tab==='socios'    && <ConfigSocios/>}
+      {tab==='proyectos' && <ConfigProyectos/>}
+      {tab==='pines'     && <ConfigPins currentRol={currentRol}/>}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   APP ROOT
+══════════════════════════════════════════ */
+function App() {
+  const [user,setUser]           = useState(null);
+  const [loginTime,setLoginTime] = useState(null);
+  const [lastAct,setLastAct]     = useState(Date.now());
+  const [warn,setWarn]           = useState(false);
+  const [view,setView]           = useState('dashboard');
+  const [rk,setRk]               = useState(0); // refresh key
+  const [sideOpen,setSideOpen]   = useState(false);
+
+  useEffect(()=>{ initDB(); const s=sessionStorage.getItem('al_session'); if(s){try{const d=JSON.parse(s);setUser(d.user);setLoginTime(d.t);}catch(e){}} },[]);
+
+  useEffect(()=>{
+    if(!user) return;
+    const act=()=>setLastAct(Date.now());
+    window.addEventListener('mousemove',act);
+    window.addEventListener('click',act);
+    window.addEventListener('touchstart',act,{passive:true});
+    const iv=setInterval(()=>{
+      const now=Date.now();
+      const idle=(now-lastAct)/60000, sess=loginTime?(now-loginTime)/60000:0;
+      setWarn(idle>55&&idle<=60);
+      if(idle>60||sess>60) logout();
+    },60000);
+    return ()=>{ clearInterval(iv); window.removeEventListener('mousemove',act); window.removeEventListener('click',act); window.removeEventListener('touchstart',act); };
+  },[user,lastAct,loginTime]);
+
+  const login = u => {
+    const t=Date.now(); setUser(u); setLoginTime(t); setLastAct(t);
+    sessionStorage.setItem('al_session',JSON.stringify({user:u,t}));
+    setView(u.rol==='asesor'?'registro':'dashboard');
+  };
+  const logout = ()=>{ setUser(null); setLoginTime(null); sessionStorage.removeItem('al_session'); setView('dashboard'); };
+  const nav = id=>{ setView(id); setSideOpen(false); };
+
+  if(!user) return <PinLogin onLogin={login}/>;
+
+  const isAsesor = user.rol==='asesor';
+  const navItems = isAsesor
+    ? [{id:'registro',label:'Nueva Venta',icon:I.plus},{id:'reportes',label:'Mis Ventas',icon:I.table}]
+    : [{id:'dashboard',label:'Inicio',icon:I.home},{id:'registro',label:'Nueva Venta',icon:I.plus},{id:'reportes',label:'Reportes',icon:I.table},{id:'config',label:'Config',icon:I.gear}];
+
+  // Guard: asesor can't access dashboard/config
+  const safeView = (isAsesor && (view==='dashboard'||view==='config')) ? 'registro' : view;
+
+  const titles={dashboard:'Inicio',registro:'Nueva Venta',reportes:isAsesor?'Mis Ventas':'Reportes',config:'Configuración'};
+
+  return (
+    <div className="layout">
+      {/* Sidebar backdrop (mobile) */}
+      <div className={'backdrop'+(sideOpen?' open':'')} onClick={()=>setSideOpen(false)}/>
+
+      {/* Sidebar */}
+      <aside className={'sidebar'+(sideOpen?' open':'')}>
+        <div style={{padding:'18px 16px',borderBottom:'1px solid var(--border)'}}>
+          <Logo/>
+        </div>
+        <nav style={{padding:'10px 8px',flex:1,overflowY:'auto'}}>
+          <p style={{fontSize:10,fontWeight:700,color:'var(--ink4)',letterSpacing:'.1em',padding:'4px 12px',textTransform:'uppercase',marginBottom:4}}>Menú</p>
+          {navItems.map(n=>(
+            <button key={n.id} className={'nav-item'+(safeView===n.id?' active':'')} onClick={()=>nav(n.id)}>
+              {n.icon} {n.label}
+            </button>
+          ))}
+        </nav>
+        <div style={{padding:'10px 8px',borderTop:'1px solid var(--border)'}}>
+          <div style={{padding:'10px 12px',borderRadius:var_r,background:'var(--surface)',border:'1px solid var(--border)',marginBottom:6,display:'flex',alignItems:'center',gap:9}}>
+            <div style={{width:30,height:30,borderRadius:8,background:'var(--orange-lt)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--orange)',flexShrink:0}}>{I.user}</div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700}}>{user.nombre}</div>
+              <div style={{fontSize:11,color:'var(--ink3)'}}>{isAsesor?'Asesor':'Administrador'}</div>
+            </div>
+          </div>
+          <button className="nav-item" onClick={logout} style={{color:'var(--red)'}}>{I.logout} Cerrar sesión</button>
+        </div>
+      </aside>
+
+      {/* Mobile top bar */}
+      <div className="topbar no-print">
+        <button className="btn-icon" style={{color:'var(--ink)'}} onClick={()=>setSideOpen(true)}>{I.menu}</button>
+        <Logo/>
+        <div style={{width:32}}/>
+      </div>
+
+      {/* Main */}
+      <main className="main">
+        {/* Desktop header */}
+        <div className="desktop-header" style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24}}>
+          <div>
+            <h1>{titles[safeView]}</h1>
+            <p style={{color:'var(--ink3)',fontSize:13,marginTop:3}}>{new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            {isAsesor&&<span className="badge badge-blue">Asesor</span>}
+            {safeView!=='registro' && (
+              <button className="btn btn-primary" style={{gap:6}} onClick={()=>nav('registro')}>
+                {I.plus} Nueva Venta
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile title */}
+        <div className="mobile-title">{titles[safeView]}</div>
+
+        {safeView==='dashboard' && <Dashboard onNav={nav} key={rk}/>}
+        {safeView==='registro'  && <Registro onSaved={()=>setRk(k=>k+1)}/>}
+        {safeView==='reportes'  && <Reportes key={rk} soloDosMeses={isAsesor}/>}
+        {safeView==='config'    && <Config currentRol={user.rol}/>}
+      </main>
+
+      {/* Mobile bottom nav */}
+      <nav className="bottomnav no-print">
+        {navItems.map(n=>(
+          <button key={n.id} className={'bnav-btn'+(safeView===n.id?' active':'')} onClick={()=>nav(n.id)}>
+            {React.cloneElement(n.icon,{width:20,height:20})}
+            <span>{n.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      {/* FAB — visible on mobile, hidden on registro view */}
+      {safeView!=='registro' && (
+        <button className="fab no-print" onClick={()=>nav('registro')} title="Nueva Venta">
+          {React.cloneElement(I.plus,{width:24,height:24})}
+        </button>
+      )}
+
+      {/* Inactivity bar */}
+      {warn&&(
+        <div className="inact-bar no-print">
+          <span>Sesión expirará pronto por inactividad</span>
+          <button onClick={()=>{setLastAct(Date.now());setWarn(false);}} style={{background:'rgba(255,255,255,.2)',border:'none',color:'#fff',padding:'6px 14px',borderRadius:8,cursor:'pointer',fontFamily:'Plus Jakarta Sans',fontWeight:600,fontSize:13}}>
+            Mantener
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
