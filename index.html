@@ -725,16 +725,22 @@ function Registro({onSaved}) {
   const registrarNuevoAsesor = async () => {
     if(!nuevoAsesorNombre.trim()){setNuevoAsesorErr('Ingresa tu nombre completo');return;}
     if(!f.empresaId){setNuevoAsesorErr('Selecciona primero la empresa');return;}
-    const emp = empresas.find(e=>e.id===+f.empresaId);
-    const listaActual = asesores.filter(a=>a.empresaId===+f.empresaId);
-    const codigo = generarCodigo(emp?.nombre||'', listaActual);
-    const nuevoId = await db.asesores.add({nombre:nuevoAsesorNombre.trim(), empresaId:+f.empresaId, codigo});
-    await loadRegistro();
-    set('asesorId', String(nuevoId));
-    setNuevoAsesorCodigo(codigo);
-    setNuevoAsesorMode(false);
-    setNuevoAsesorNombre('');
-    setNuevoAsesorErr('');
+    try {
+      const emp = empresas.find(e=>e.id===+f.empresaId);
+      const listaActual = asesores.filter(a=>a.empresaId===+f.empresaId);
+      const codigo = generarCodigo(emp?.nombre||'', listaActual);
+      const nuevoId = await db.asesores.add({nombre:nuevoAsesorNombre.trim(), empresaId:+f.empresaId, codigo});
+      await loadRegistro();
+      // Esperar a que loadRegistro termine y luego seleccionar el nuevo asesor
+      setTimeout(()=>set('asesorId', String(nuevoId)), 500);
+      setNuevoAsesorCodigo(codigo);
+      setNuevoAsesorMode(false);
+      setNuevoAsesorNombre('');
+      setNuevoAsesorErr('');
+    } catch(err) {
+      console.error('Error registrando asesor:', err);
+      setNuevoAsesorErr('Error al registrar: ' + (err?.message||'verifica la conexión'));
+    }
   };
 
   // Derived filtered lists
