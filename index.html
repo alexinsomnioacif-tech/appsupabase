@@ -1813,7 +1813,7 @@ function App() {
 
   const isAsesor = user.rol==='asesor';
   const navItems = isAsesor
-    ? [{id:'registro',label:'Nueva Venta',icon:I.plus},{id:'reportes',label:'Mis Ventas',icon:I.table}]
+    ? [{id:'registro',label:'Nueva Venta',icon:I.plus}]
     : [{id:'dashboard',label:'Inicio',icon:I.home},{id:'registro',label:'Nueva Venta',icon:I.plus},{id:'reportes',label:'Reportes',icon:I.table},{id:'config',label:'Config',icon:I.gear}];
 
   // Guard: asesor can't access dashboard/config
